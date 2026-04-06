@@ -52,6 +52,7 @@ import {
   PromptInputTools,
 } from "../ai-elements/prompt-input";
 import { Button } from "../ui/button";
+import { DatasetLoader, type LoadedDataset } from "./dataset-loader";
 import { PaperclipIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
 import {
@@ -112,6 +113,9 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const hasAutoFocused = useRef(false);
+  const [activeDataset, setActiveDataset] = useState<LoadedDataset | null>(
+    null
+  );
   useEffect(() => {
     if (!hasAutoFocused.current && width) {
       const timer = setTimeout(() => {
@@ -525,6 +529,10 @@ function PureMultimodalInput({
             <ModelSelectorCompact
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}
+            />
+            <DatasetLoader
+              currentDataset={activeDataset}
+              onDatasetLoad={setActiveDataset}
             />
           </PromptInputTools>
 

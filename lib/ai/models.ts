@@ -1,11 +1,14 @@
-export const DEFAULT_CHAT_MODEL = "moonshotai/kimi-k2-0905";
+// Default model – can be overridden via DEFAULT_CHAT_MODEL env var.
+// Set AI_PROVIDER=vertex and configure GOOGLE_VERTEX_PROJECT to use
+// Google Vertex AI instead of OpenAI.
+export const DEFAULT_CHAT_MODEL =
+  process.env.DEFAULT_CHAT_MODEL ?? "gpt-4o-mini";
 
 export const titleModel = {
-  id: "mistral/mistral-small",
-  name: "Mistral Small",
-  provider: "mistral",
+  id: process.env.DEFAULT_TITLE_MODEL ?? "gpt-4o-mini",
+  name: "GPT-4o Mini",
+  provider: "openai",
   description: "Fast model for title generation",
-  gatewayOrder: ["mistral"],
 };
 
 export type ModelCapabilities = {
@@ -19,156 +22,68 @@ export type ChatModel = {
   name: string;
   provider: string;
   description: string;
-  gatewayOrder?: string[];
+  capabilities: ModelCapabilities;
   reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
 };
 
-export const chatModels: ChatModel[] = [
+// Models are resolved from the AI_PROVIDER env var at runtime.
+// For OpenAI / OpenAI-compatible (e.g. Ollama): set AI_PROVIDER=openai and
+//   OPENAI_API_KEY / OPENAI_BASE_URL (leave OPENAI_BASE_URL unset for OpenAI).
+// For Google Vertex AI: set AI_PROVIDER=vertex and GOOGLE_VERTEX_PROJECT.
+export const openaiModels: ChatModel[] = [
   {
-    id: "deepseek/deepseek-v3.2",
-    name: "DeepSeek V3.2",
-    provider: "deepseek",
-    description: "Fast and capable model with tool use",
-    gatewayOrder: ["bedrock", "deepinfra"],
-  },
-  {
-    id: "mistral/codestral",
-    name: "Codestral",
-    provider: "mistral",
-    description: "Code-focused model with tool use",
-    gatewayOrder: ["mistral"],
-  },
-  {
-    id: "mistral/mistral-small",
-    name: "Mistral Small",
-    provider: "mistral",
-    description: "Fast vision model with tool use",
-    gatewayOrder: ["mistral"],
-  },
-  {
-    id: "moonshotai/kimi-k2-0905",
-    name: "Kimi K2 0905",
-    provider: "moonshotai",
-    description: "Fast model with tool use",
-    gatewayOrder: ["baseten", "fireworks"],
-  },
-  {
-    id: "moonshotai/kimi-k2.5",
-    name: "Kimi K2.5",
-    provider: "moonshotai",
-    description: "Moonshot AI flagship model",
-    gatewayOrder: ["fireworks", "bedrock"],
-  },
-  {
-    id: "openai/gpt-oss-20b",
-    name: "GPT OSS 20B",
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
     provider: "openai",
-    description: "Compact reasoning model",
-    gatewayOrder: ["groq", "bedrock"],
-    reasoningEffort: "low",
+    description: "Fast and affordable model with vision and tool use",
+    capabilities: { tools: true, vision: true, reasoning: false },
   },
   {
-    id: "openai/gpt-oss-120b",
-    name: "GPT OSS 120B",
+    id: "gpt-4o",
+    name: "GPT-4o",
     provider: "openai",
-    description: "Open-source 120B parameter model",
-    gatewayOrder: ["fireworks", "bedrock"],
-    reasoningEffort: "low",
+    description: "Highly capable model with vision and tool use",
+    capabilities: { tools: true, vision: true, reasoning: false },
   },
   {
-    id: "xai/grok-4.1-fast-non-reasoning",
-    name: "Grok 4.1 Fast",
-    provider: "xai",
-    description: "Fast non-reasoning model with tool use",
-    gatewayOrder: ["xai"],
+    id: "o4-mini",
+    name: "o4 Mini",
+    provider: "openai",
+    description: "Efficient reasoning model",
+    capabilities: { tools: true, vision: false, reasoning: true },
+    reasoningEffort: "medium",
   },
 ];
 
-export async function getCapabilities(): Promise<
-  Record<string, ModelCapabilities>
-> {
-  const results = await Promise.all(
-    chatModels.map(async (model) => {
-      try {
-        const res = await fetch(
-          `https://ai-gateway.vercel.sh/v1/models/${model.id}/endpoints`,
-          { next: { revalidate: 86_400 } }
-        );
-        if (!res.ok) {
-          return [model.id, { tools: false, vision: false, reasoning: false }];
-        }
+export const vertexModels: ChatModel[] = [
+  {
+    id: "gemini-2.0-flash",
+    name: "Gemini 2.0 Flash",
+    provider: "vertex",
+    description: "Fast and capable Gemini model with tool use",
+    capabilities: { tools: true, vision: true, reasoning: false },
+  },
+  {
+    id: "gemini-2.0-flash-thinking-exp-1219",
+    name: "Gemini 2.0 Flash Thinking",
+    provider: "vertex",
+    description: "Gemini model with reasoning capabilities",
+    capabilities: { tools: false, vision: true, reasoning: true },
+  },
+];
 
-        const json = await res.json();
-        const endpoints = json.data?.endpoints ?? [];
-        const params = new Set(
-          endpoints.flatMap(
-            (e: { supported_parameters?: string[] }) =>
-              e.supported_parameters ?? []
-          )
-        );
-        const inputModalities = new Set(
-          json.data?.architecture?.input_modalities ?? []
-        );
+function getActiveProvider(): string {
+  return process.env.AI_PROVIDER ?? "openai";
+}
 
-        return [
-          model.id,
-          {
-            tools: params.has("tools"),
-            vision: inputModalities.has("image"),
-            reasoning: params.has("reasoning"),
-          },
-        ];
-      } catch {
-        return [model.id, { tools: false, vision: false, reasoning: false }];
-      }
-    })
-  );
+export const chatModels: ChatModel[] =
+  getActiveProvider() === "vertex" ? vertexModels : openaiModels;
 
-  return Object.fromEntries(results);
+export function getCapabilities(): Record<string, ModelCapabilities> {
+  return Object.fromEntries(chatModels.map((m) => [m.id, m.capabilities]));
 }
 
 export const isDemo = process.env.IS_DEMO === "1";
-
-type GatewayModel = {
-  id: string;
-  name: string;
-  type?: string;
-  tags?: string[];
-};
-
-export type GatewayModelWithCapabilities = ChatModel & {
-  capabilities: ModelCapabilities;
-};
-
-export async function getAllGatewayModels(): Promise<
-  GatewayModelWithCapabilities[]
-> {
-  try {
-    const res = await fetch("https://ai-gateway.vercel.sh/v1/models", {
-      next: { revalidate: 86_400 },
-    });
-    if (!res.ok) {
-      return [];
-    }
-
-    const json = await res.json();
-    return (json.data ?? [])
-      .filter((m: GatewayModel) => m.type === "language")
-      .map((m: GatewayModel) => ({
-        id: m.id,
-        name: m.name,
-        provider: m.id.split("/")[0],
-        description: "",
-        capabilities: {
-          tools: m.tags?.includes("tool-use") ?? false,
-          vision: m.tags?.includes("vision") ?? false,
-          reasoning: m.tags?.includes("reasoning") ?? false,
-        },
-      }));
-  } catch {
-    return [];
-  }
-}
 
 export function getActiveModels(): ChatModel[] {
   return chatModels;
