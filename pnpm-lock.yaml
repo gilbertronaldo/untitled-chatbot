@@ -26,6 +26,12 @@ importers:
       '@codemirror/view':
         specifier: ^6.35.3
         version: 6.36.4
+      '@json-render/core':
+        specifier: ^0.16.0
+        version: 0.16.0(zod@3.25.76)
+      '@json-render/react':
+        specifier: ^0.16.0
+        version: 0.16.0(react@19.0.1)(zod@3.25.76)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -1068,6 +1074,16 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
+
+  '@json-render/core@0.16.0':
+    resolution: {integrity: sha512-qQp8BB/3pWYapTGXBDSBMXRCdrC05VJPLL3drXMPX/QbUB3nuvtyXUGmAZFUz8eLUy7JImODvb3GNIq38dGzhQ==}
+    peerDependencies:
+      zod: ^4.0.0
+
+  '@json-render/react@0.16.0':
+    resolution: {integrity: sha512-PJQjLftGYZ5LNlA1IFww+yNOAJZRW2feEcH/L10u/8M/b/zImr9wfqQVMDyC87myoEzhyucpkQ6joISeZdKxsw==}
+    peerDependencies:
+      react: ^19.2.3
 
   '@lezer/common@1.2.3':
     resolution: {integrity: sha512-w7ojc8ejBqr2REPsWxJjrMFsA/ysDCFICn8zEOR9mrqzOu2amhITYuLD8ag6XZf0CFXDrhKqw7+tW8cX66NaDA==}
@@ -4634,6 +4650,17 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
+
+  '@json-render/core@0.16.0(zod@3.25.76)':
+    dependencies:
+      zod: 3.25.76
+
+  '@json-render/react@0.16.0(react@19.0.1)(zod@3.25.76)':
+    dependencies:
+      '@json-render/core': 0.16.0(zod@3.25.76)
+      react: 19.0.1
+    transitivePeerDependencies:
+      - zod
 
   '@lezer/common@1.2.3': {}
 

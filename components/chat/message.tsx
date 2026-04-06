@@ -128,7 +128,7 @@ const PurePreviewMessage = ({
             <div className="flex flex-col gap-2" key={key}>
               {segments.map((seg, si) => {
                 if (seg.kind === "visualization" && seg.spec) {
-                  const vizKey = `${key}-viz-${seg.spec.title ?? si}`;
+                  const vizKey = `${key}-viz-${seg.spec.root ?? si}`;
                   return <VisualizationRenderer key={vizKey} spec={seg.spec} />;
                 }
                 if (seg.content.trim()) {

@@ -1,63 +1,32 @@
 "use client";
 
-// Chart renderer for AI BI Copilot – renders JSON visualization instructions as SVG charts
+// Chart renderer for AI BI Copilot – uses @json-render/react Renderer with custom SVG chart components.
+
+import type { Spec } from "@json-render/core";
+import {
+  type ComponentRegistry,
+  type ComponentRenderer,
+  Renderer,
+} from "@json-render/react";
+import type { ReactNode } from "react";
+
+// ── Data types ────────────────────────────────────────────────────────────────
 
 export interface ChartDataPoint {
   label: string;
   value: number;
 }
 
-export interface ChartSpec {
-  type: "chart";
-  chartType: "bar" | "line" | "pie";
+interface ChartProps {
   title: string;
   data: ChartDataPoint[];
 }
 
-export interface DashboardSpec {
-  type: "dashboard";
+interface DashboardProps {
   title: string;
-  widgets: ChartSpec[];
 }
 
-export type VisualizationSpec = ChartSpec | DashboardSpec;
-
-/** Sanitize a string for use as an SVG element ID */
-function sanitizeId(str: string): string {
-  return str.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 40);
-}
-
-/** Type guard: check that a parsed object is a valid ChartSpec */
-function isChartSpec(v: unknown): v is ChartSpec {
-  if (!v || typeof v !== "object") {
-    return false;
-  }
-  const o = v as Record<string, unknown>;
-  return (
-    o.type === "chart" &&
-    typeof o.title === "string" &&
-    ["bar", "line", "pie"].includes(o.chartType as string) &&
-    Array.isArray(o.data)
-  );
-}
-
-/** Type guard: check that a parsed object is a valid DashboardSpec */
-function isDashboardSpec(v: unknown): v is DashboardSpec {
-  if (!v || typeof v !== "object") {
-    return false;
-  }
-  const o = v as Record<string, unknown>;
-  return (
-    o.type === "dashboard" &&
-    typeof o.title === "string" &&
-    Array.isArray(o.widgets)
-  );
-}
-
-/** Type guard: check that a parsed object is a valid VisualizationSpec */
-export function isVisualizationSpec(v: unknown): v is VisualizationSpec {
-  return isChartSpec(v) || isDashboardSpec(v);
-}
+// ── Colour palette ─────────────────────────────────────────────────────────────
 
 const COLORS = [
   "#6366f1",
@@ -70,8 +39,17 @@ const COLORS = [
   "#14b8a6",
 ];
 
-function BarChart({ spec }: { spec: ChartSpec }) {
-  const { data, title } = spec;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Sanitize a string for use as an SVG element ID */
+function sanitizeId(str: string): string {
+  return str.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 40);
+}
+
+// ── Chart components ──────────────────────────────────────────────────────────
+
+const BarChart: ComponentRenderer<ChartProps> = ({ element }) => {
+  const { title, data } = element.props;
   if (!data?.length) {
     return null;
   }
@@ -85,7 +63,6 @@ function BarChart({ spec }: { spec: ChartSpec }) {
   const maxVal = Math.max(...data.map((d) => d.value));
   const barWidth = Math.max(8, (chartWidth / data.length) * 0.6);
   const barGap = chartWidth / data.length;
-
   const yTicks = 4;
   const yTickStep = Math.ceil(maxVal / yTicks / 10) * 10 || 1;
 
@@ -100,7 +77,6 @@ function BarChart({ spec }: { spec: ChartSpec }) {
         width="100%"
       >
         <g transform={`translate(${padding.left},${padding.top})`}>
-          {/* Y-axis gridlines and labels */}
           {Array.from({ length: yTicks + 1 }, (_, i) => {
             const val = i * yTickStep;
             if (val > maxVal * 1.1) {
@@ -136,8 +112,6 @@ function BarChart({ spec }: { spec: ChartSpec }) {
               </g>
             );
           })}
-
-          {/* Bars */}
           {data.map((d, i) => {
             const x = i * barGap + (barGap - barWidth) / 2;
             const barH =
@@ -168,8 +142,6 @@ function BarChart({ spec }: { spec: ChartSpec }) {
               </g>
             );
           })}
-
-          {/* Axes */}
           <line
             stroke="currentColor"
             strokeOpacity={0.2}
@@ -190,10 +162,10 @@ function BarChart({ spec }: { spec: ChartSpec }) {
       </svg>
     </div>
   );
-}
+};
 
-function LineChart({ spec }: { spec: ChartSpec }) {
-  const { data, title } = spec;
+const LineChart: ComponentRenderer<ChartProps> = ({ element }) => {
+  const { title, data } = element.props;
   if (!data?.length) {
     return null;
   }
@@ -222,8 +194,6 @@ function LineChart({ spec }: { spec: ChartSpec }) {
     .join(" ");
 
   const areaD = `${pathD} L ${points.at(-1)?.x} ${chartHeight} L 0 ${chartHeight} Z`;
-
-  // Use a sanitized, unique gradient ID to avoid SVG ID collisions
   const gradId = `lg-${sanitizeId(title)}`;
 
   return (
@@ -284,10 +254,10 @@ function LineChart({ spec }: { spec: ChartSpec }) {
       </svg>
     </div>
   );
-}
+};
 
-function PieChart({ spec }: { spec: ChartSpec }) {
-  const { data, title } = spec;
+const PieChart: ComponentRenderer<ChartProps> = ({ element }) => {
+  const { title, data } = element.props;
   if (!data?.length) {
     return null;
   }
@@ -300,8 +270,8 @@ function PieChart({ spec }: { spec: ChartSpec }) {
   const cx = 80;
   const cy = 80;
   const r = 70;
-
   let startAngle = -Math.PI / 2;
+
   const slices = data.map((d, i) => {
     const angle = (d.value / total) * 2 * Math.PI;
     const endAngle = startAngle + angle;
@@ -310,17 +280,11 @@ function PieChart({ spec }: { spec: ChartSpec }) {
     const x2 = cx + r * Math.cos(endAngle);
     const y2 = cy + r * Math.sin(endAngle);
     const largeArc = angle > Math.PI ? 1 : 0;
-    const midAngle = startAngle + angle / 2;
-    const lx = cx + (r + 14) * Math.cos(midAngle);
-    const ly = cy + (r + 14) * Math.sin(midAngle);
     const slice = {
       d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`,
       color: COLORS[i % COLORS.length],
       label: d.label,
-      value: d.value,
       pct: Math.round((d.value / total) * 100),
-      lx,
-      ly,
     };
     startAngle = endAngle;
     return slice;
@@ -357,45 +321,69 @@ function PieChart({ spec }: { spec: ChartSpec }) {
       </div>
     </div>
   );
+};
+
+/** Dashboard wrapper – renders its children (chart elements) in a responsive grid */
+const Dashboard: ComponentRenderer<DashboardProps> = ({
+  element,
+  children,
+}: {
+  element: { props: DashboardProps };
+  children?: ReactNode;
+}) => (
+  <div className="my-1 w-full">
+    <p className="mb-3 font-semibold text-foreground text-sm">
+      {element.props.title}
+    </p>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
+  </div>
+);
+
+// ── Component registry ────────────────────────────────────────────────────────
+
+/**
+ * Registry of BI visualisation components for use with @json-render/react Renderer.
+ * Maps component type names → React component implementations.
+ */
+const biRegistry: ComponentRegistry = {
+  BarChart: BarChart as ComponentRenderer<any>,
+  LineChart: LineChart as ComponentRenderer<any>,
+  PieChart: PieChart as ComponentRenderer<any>,
+  Dashboard: Dashboard as ComponentRenderer<any>,
+};
+
+// ── Spec type helpers ─────────────────────────────────────────────────────────
+
+/** Type guard: check that a parsed object is a valid json-render Spec */
+export function isVisualizationSpec(v: unknown): v is Spec {
+  if (!v || typeof v !== "object") {
+    return false;
+  }
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.root === "string" &&
+    o.elements !== null &&
+    typeof o.elements === "object"
+  );
 }
 
-function ChartCard({ spec }: { spec: ChartSpec }) {
+// ── Renderer ──────────────────────────────────────────────────────────────────
+
+/**
+ * Renders a json-render Spec as a BI visualisation (chart or dashboard).
+ * Uses @json-render/react Renderer under the hood.
+ */
+export function VisualizationRenderer({ spec }: { spec: Spec }) {
   return (
-    <div className="rounded-xl border border-border/50 bg-card/40 p-4 shadow-sm">
-      {spec.chartType === "bar" && <BarChart spec={spec} />}
-      {spec.chartType === "line" && <LineChart spec={spec} />}
-      {spec.chartType === "pie" && <PieChart spec={spec} />}
+    <div className="my-3 w-full max-w-2xl">
+      <div className="rounded-xl border border-border/50 bg-card/40 p-4 shadow-sm">
+        <Renderer registry={biRegistry} spec={spec} />
+      </div>
     </div>
   );
 }
 
-export function VisualizationRenderer({ spec }: { spec: VisualizationSpec }) {
-  if (spec.type === "chart") {
-    return (
-      <div className="my-3 w-full max-w-lg">
-        <ChartCard spec={spec} />
-      </div>
-    );
-  }
-
-  if (spec.type === "dashboard") {
-    return (
-      <div className="my-3 w-full">
-        <p className="mb-3 font-semibold text-foreground text-sm">
-          {spec.title}
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {spec.widgets.map((widget, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: widget order is stable
-            <ChartCard key={i} spec={widget} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
+// ── Text parser ───────────────────────────────────────────────────────────────
 
 /**
  * Parses visualization JSON blocks from AI message text.
@@ -404,12 +392,12 @@ export function VisualizationRenderer({ spec }: { spec: VisualizationSpec }) {
 export function parseVisualizationBlocks(text: string): Array<{
   kind: "text" | "visualization";
   content: string;
-  spec?: VisualizationSpec;
+  spec?: Spec;
 }> {
   const segments: Array<{
     kind: "text" | "visualization";
     content: string;
-    spec?: VisualizationSpec;
+    spec?: Spec;
   }> = [];
 
   const FENCE_RE = /```visualization\n([\s\S]*?)```/g;
@@ -434,11 +422,10 @@ export function parseVisualizationBlocks(text: string): Array<{
           spec: parsed,
         });
       } else {
-        // Valid JSON but not a recognized visualization spec – treat as text
         segments.push({ kind: "text", content: match[0] });
       }
     } catch {
-      // If JSON parse fails, treat as plain text
+      // JSON parse failed – treat as plain text
       segments.push({ kind: "text", content: match[0] });
     }
 

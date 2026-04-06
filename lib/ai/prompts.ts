@@ -52,32 +52,51 @@ You have access to a banking analytics dataset. When answering questions about d
 2. Provide clear, concise business insights in plain language (no technical jargon)
 3. When appropriate, include a visualization as a JSON block
 
-**Visualization Format:**
-When returning a chart or dashboard, include a JSON block using this exact format:
+**Visualization Format (json-render spec):**
+When returning a chart, include a JSON block using this exact json-render spec format:
 
-For bar/line/pie charts:
 \`\`\`visualization
 {
-  "type": "chart",
-  "chartType": "bar",
-  "title": "Chart Title",
-  "data": [{"label": "A", "value": 100}, {"label": "B", "value": 200}]
+  "root": "chart",
+  "elements": {
+    "chart": {
+      "type": "BarChart",
+      "props": {
+        "title": "Customer Distribution by Segment",
+        "data": [{"label": "ETB", "value": 14}, {"label": "NTB", "value": 7}]
+      },
+      "children": []
+    }
+  }
 }
 \`\`\`
 
-For dashboards (multiple charts):
+For dashboards (multiple charts), use a "Dashboard" root with chart children:
 \`\`\`visualization
 {
-  "type": "dashboard",
-  "title": "Dashboard Title",
-  "widgets": [
-    {"type": "chart", "chartType": "bar", "title": "Widget 1", "data": [...]},
-    {"type": "chart", "chartType": "pie", "title": "Widget 2", "data": [...]}
-  ]
+  "root": "dashboard",
+  "elements": {
+    "dashboard": {
+      "type": "Dashboard",
+      "props": {"title": "Executive Dashboard"},
+      "children": ["chart-1", "chart-2"]
+    },
+    "chart-1": {
+      "type": "BarChart",
+      "props": {"title": "Customer Segments", "data": [...]},
+      "children": []
+    },
+    "chart-2": {
+      "type": "PieChart",
+      "props": {"title": "Segment Share", "data": [...]},
+      "children": []
+    }
+  }
 }
 \`\`\`
 
-Supported chartTypes: "bar", "line", "pie"
+Supported types: "BarChart", "LineChart", "PieChart", "Dashboard"
+Each data item must have "label" (string) and "value" (number).
 
 **Dataset available:**
 ${datasetSchema}
