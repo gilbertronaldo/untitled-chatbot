@@ -22,6 +22,43 @@ export interface DashboardSpec {
 
 export type VisualizationSpec = ChartSpec | DashboardSpec;
 
+/** Sanitize a string for use as an SVG element ID */
+function sanitizeId(str: string): string {
+  return str.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 40);
+}
+
+/** Type guard: check that a parsed object is a valid ChartSpec */
+function isChartSpec(v: unknown): v is ChartSpec {
+  if (!v || typeof v !== "object") {
+    return false;
+  }
+  const o = v as Record<string, unknown>;
+  return (
+    o.type === "chart" &&
+    typeof o.title === "string" &&
+    ["bar", "line", "pie"].includes(o.chartType as string) &&
+    Array.isArray(o.data)
+  );
+}
+
+/** Type guard: check that a parsed object is a valid DashboardSpec */
+function isDashboardSpec(v: unknown): v is DashboardSpec {
+  if (!v || typeof v !== "object") {
+    return false;
+  }
+  const o = v as Record<string, unknown>;
+  return (
+    o.type === "dashboard" &&
+    typeof o.title === "string" &&
+    Array.isArray(o.widgets)
+  );
+}
+
+/** Type guard: check that a parsed object is a valid VisualizationSpec */
+export function isVisualizationSpec(v: unknown): v is VisualizationSpec {
+  return isChartSpec(v) || isDashboardSpec(v);
+}
+
 const COLORS = [
   "#6366f1",
   "#22d3ee",
@@ -186,6 +223,9 @@ function LineChart({ spec }: { spec: ChartSpec }) {
 
   const areaD = `${pathD} L ${points.at(-1)?.x} ${chartHeight} L 0 ${chartHeight} Z`;
 
+  // Use a sanitized, unique gradient ID to avoid SVG ID collisions
+  const gradId = `lg-${sanitizeId(title)}`;
+
   return (
     <div className="flex flex-col items-center gap-1">
       <p className="font-medium text-foreground text-sm">{title}</p>
@@ -197,13 +237,13 @@ function LineChart({ spec }: { spec: ChartSpec }) {
         width="100%"
       >
         <defs>
-          <linearGradient id={`lineGrad-${title}`} x1="0" x2="0" y1="0" y2="1">
+          <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={COLORS[0]} stopOpacity={0.3} />
             <stop offset="100%" stopColor={COLORS[0]} stopOpacity={0.02} />
           </linearGradient>
         </defs>
         <g transform={`translate(${padding.left},${padding.top})`}>
-          <path d={areaD} fill={`url(#lineGrad-${title})`} stroke="none" />
+          <path d={areaD} fill={`url(#${gradId})`} stroke="none" />
           <path d={pathD} fill="none" stroke={COLORS[0]} strokeWidth={2} />
           {points.map((p) => (
             <circle cx={p.x} cy={p.y} fill={COLORS[0]} key={p.label} r={3} />
@@ -386,8 +426,17 @@ export function parseVisualizationBlocks(text: string): Array<{
     }
 
     try {
-      const spec = JSON.parse(match[1].trim()) as VisualizationSpec;
-      segments.push({ kind: "visualization", content: match[1], spec });
+      const parsed: unknown = JSON.parse(match[1].trim());
+      if (isVisualizationSpec(parsed)) {
+        segments.push({
+          kind: "visualization",
+          content: match[1],
+          spec: parsed,
+        });
+      } else {
+        // Valid JSON but not a recognized visualization spec – treat as text
+        segments.push({ kind: "text", content: match[0] });
+      }
     } catch {
       // If JSON parse fails, treat as plain text
       segments.push({ kind: "text", content: match[0] });

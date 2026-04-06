@@ -82,6 +82,10 @@ Supported chartTypes: "bar", "line", "pie"
 **Dataset available:**
 ${datasetSchema}
 
+/**
+ * NOTE: The full dataset is embedded here for demo simplicity.
+ * In production, replace with an on-demand query tool to reduce token usage.
+ */
 **Full dataset (JSON):**
 ${JSON.stringify(bankingDataset)}
 
