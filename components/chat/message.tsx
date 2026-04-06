@@ -12,6 +12,10 @@ import {
   ToolInput,
   ToolOutput,
 } from "../ai-elements/tool";
+import {
+  parseVisualizationBlocks,
+  VisualizationRenderer,
+} from "./chart-renderer";
 import { useDataStream } from "./data-stream-provider";
 import { DocumentToolResult } from "./document";
 import { DocumentPreview } from "./document-preview";
@@ -114,6 +118,37 @@ const PurePreviewMessage = ({
     }
 
     if (type === "text") {
+      // For assistant messages, check for visualization JSON blocks
+      if (message.role === "assistant") {
+        const segments = parseVisualizationBlocks(sanitizeText(part.text));
+        const hasViz = segments.some((s) => s.kind === "visualization");
+
+        if (hasViz) {
+          return (
+            <div className="flex flex-col gap-2" key={key}>
+              {segments.map((seg, si) => {
+                if (seg.kind === "visualization" && seg.spec) {
+                  const vizKey = `${key}-viz-${seg.spec.title ?? si}`;
+                  return <VisualizationRenderer key={vizKey} spec={seg.spec} />;
+                }
+                if (seg.content.trim()) {
+                  const txtKey = `${key}-txt-${si}`;
+                  return (
+                    <MessageContent
+                      className="text-[13px] leading-[1.65]"
+                      key={txtKey}
+                    >
+                      <MessageResponse>{seg.content}</MessageResponse>
+                    </MessageContent>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          );
+        }
+      }
+
       return (
         <MessageContent
           className={cn("text-[13px] leading-[1.65]", {
