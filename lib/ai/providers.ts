@@ -1,4 +1,4 @@
-import { createVertex } from "@ai-sdk/google-vertex";
+import { createVertex } from "@ai-sdk/google-vertex/edge";
 import { createOpenAI } from "@ai-sdk/openai";
 import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
@@ -50,8 +50,12 @@ function openaiProvider() {
  */
 function vertexProvider() {
   return createVertex({
-    project: process.env.GOOGLE_VERTEX_PROJECT,
-    location: process.env.GOOGLE_VERTEX_LOCATION ?? "us-central1",
+    project: "greatnusa-00", // optional
+    location: "us-central1", // optional
+    googleCredentials: {
+      clientEmail: process.env.GOOGLE_CLIENT_EMAIL || "",
+      privateKey: process.env.GOOGLE_PRIVATE_KEY || "",
+    },
   });
 }
 

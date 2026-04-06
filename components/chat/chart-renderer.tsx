@@ -6,7 +6,10 @@ import type { Spec } from "@json-render/core";
 import {
   type ComponentRegistry,
   type ComponentRenderer,
+  ActionProvider,
   Renderer,
+  StateProvider,
+  VisibilityProvider,
 } from "@json-render/react";
 import type { ReactNode } from "react";
 
@@ -325,9 +328,9 @@ const PieChart: ComponentRenderer<ChartProps> = ({ element }) => {
 
 /** Dashboard wrapper – renders its children (chart elements) in a responsive grid */
 const Dashboard: ComponentRenderer<DashboardProps> = ({
-  element,
-  children,
-}: {
+                                                        element,
+                                                        children,
+                                                      }: {
   element: { props: DashboardProps };
   children?: ReactNode;
 }) => (
@@ -377,7 +380,13 @@ export function VisualizationRenderer({ spec }: { spec: Spec }) {
   return (
     <div className="my-3 w-full max-w-2xl">
       <div className="rounded-xl border border-border/50 bg-card/40 p-4 shadow-sm">
-        <Renderer registry={biRegistry} spec={spec} />
+        <StateProvider initialState={spec.state ?? {}}>
+          <ActionProvider handlers={{}}>
+            <VisibilityProvider>
+              <Renderer registry={biRegistry} spec={spec} />
+            </VisibilityProvider>
+          </ActionProvider>
+        </StateProvider>
       </div>
     </div>
   );
@@ -422,17 +431,11 @@ export function parseVisualizationBlocks(text: string): Array<{
           spec: parsed,
         });
       } else {
-        // Valid JSON but not a valid Spec — show as a JSON code block so
-        // Streamdown/Shiki can highlight it without the unknown language error.
-        segments.push({
-          kind: "text",
-          content: `\`\`\`json\n${match[1].trim()}\n\`\`\``,
-        });
+        segments.push({ kind: "text", content: match[0] });
       }
     } catch {
-      // JSON parse failed — strip the fence entirely to avoid the
-      // "Language `visualization` is not included in this bundle" Shiki error.
-      segments.push({ kind: "text", content: match[1].trim() });
+      // JSON parse failed – treat as plain text
+      segments.push({ kind: "text", content: match[0] });
     }
 
     lastIndex = match.index + match[0].length;

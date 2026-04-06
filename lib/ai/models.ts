@@ -2,13 +2,13 @@
 // Set AI_PROVIDER=vertex and configure GOOGLE_VERTEX_PROJECT to use
 // Google Vertex AI instead of OpenAI.
 export const DEFAULT_CHAT_MODEL =
-  process.env.DEFAULT_CHAT_MODEL ?? "gpt-4o-mini";
+  process.env.DEFAULT_CHAT_MODEL ?? "gemini-2.5-flash";
 
 export const titleModel = {
-  id: process.env.DEFAULT_TITLE_MODEL ?? "gpt-4o-mini",
-  name: "GPT-4o Mini",
-  provider: "openai",
-  description: "Fast model for title generation",
+  id: process.env.DEFAULT_TITLE_MODEL ?? "gemini-2.5-flash",
+  name: "Gemini 2.5 Flash",
+  provider: "vertex",
+  description: "Model used for generating conversation titles"
 };
 
 export type ModelCapabilities = {
@@ -57,27 +57,20 @@ export const openaiModels: ChatModel[] = [
 
 export const vertexModels: ChatModel[] = [
   {
-    id: "gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
     provider: "vertex",
     description: "Fast and capable Gemini model with tool use",
     capabilities: { tools: true, vision: true, reasoning: false },
   },
-  {
-    id: "gemini-2.0-flash-thinking-exp-1219",
-    name: "Gemini 2.0 Flash Thinking",
-    provider: "vertex",
-    description: "Gemini model with reasoning capabilities",
-    capabilities: { tools: false, vision: true, reasoning: true },
-  },
 ];
 
 function getActiveProvider(): string {
-  return process.env.AI_PROVIDER ?? "openai";
+  return process.env.AI_PROVIDER ?? "vertex";
 }
 
 export const chatModels: ChatModel[] =
-  getActiveProvider() === "vertex" ? vertexModels : openaiModels;
+  getActiveProvider() === "vertex" ? vertexModels : [];
 
 export function getCapabilities(): Record<string, ModelCapabilities> {
   return Object.fromEntries(chatModels.map((m) => [m.id, m.capabilities]));
