@@ -118,12 +118,16 @@ const PurePreviewMessage = ({
     }
 
     if (type === "text") {
-      // For assistant messages, check for visualization JSON blocks
+      // For assistant messages, always parse visualization blocks so that
+      // ```visualization fences never reach Streamdown/Shiki (which would log
+      // "Language `visualization` is not included in this bundle").
       if (message.role === "assistant") {
         const segments = parseVisualizationBlocks(sanitizeText(part.text));
-        const hasViz = segments.some((s) => s.kind === "visualization");
+        const shouldUseSegmentRendering =
+          segments.length > 1 ||
+          segments.some((s) => s.kind === "visualization");
 
-        if (hasViz) {
+        if (shouldUseSegmentRendering) {
           return (
             <div className="flex flex-col gap-2" key={key}>
               {segments.map((seg, si) => {

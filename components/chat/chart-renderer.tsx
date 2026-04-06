@@ -422,11 +422,17 @@ export function parseVisualizationBlocks(text: string): Array<{
           spec: parsed,
         });
       } else {
-        segments.push({ kind: "text", content: match[0] });
+        // Valid JSON but not a valid Spec — show as a JSON code block so
+        // Streamdown/Shiki can highlight it without the unknown language error.
+        segments.push({
+          kind: "text",
+          content: `\`\`\`json\n${match[1].trim()}\n\`\`\``,
+        });
       }
     } catch {
-      // JSON parse failed – treat as plain text
-      segments.push({ kind: "text", content: match[0] });
+      // JSON parse failed — strip the fence entirely to avoid the
+      // "Language `visualization` is not included in this bundle" Shiki error.
+      segments.push({ kind: "text", content: match[1].trim() });
     }
 
     lastIndex = match.index + match[0].length;
