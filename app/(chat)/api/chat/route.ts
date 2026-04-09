@@ -44,6 +44,7 @@ import type { ChatMessage } from "@/lib/types";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
+import {pipeJsonRender} from "@json-render/core";
 
 export const maxDuration = 60;
 
@@ -239,6 +240,8 @@ export async function POST(request: Request) {
         dataStream.merge(
           result.toUIMessageStream({ sendReasoning: isReasoningModel })
         );
+
+        dataStream.merge(pipeJsonRender(result.toUIMessageStream()));
 
         if (titlePromise) {
           const title = await titlePromise;

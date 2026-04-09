@@ -24,6 +24,9 @@ import { MessageActions } from "./message-actions";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
+import {SPEC_DATA_PART_TYPE} from "@json-render/core";
+import {Renderer, useJsonRenderMessage} from "@json-render/react";
+import {registry} from "@/components/chat/json-render-registry";
 
 const PurePreviewMessage = ({
   addToolApprovalResponse,
@@ -56,6 +59,8 @@ const PurePreviewMessage = ({
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+
+  const { spec, text, hasSpec } = useJsonRenderMessage(message.parts);
 
   const hasAnyContent = message.parts?.some(
     (part) =>
@@ -99,10 +104,71 @@ const PurePreviewMessage = ({
     { text: "", isStreaming: false, rendered: false }
   ) ?? { text: "", isStreaming: false, rendered: false };
 
-  const parts = message.parts?.map((part, index) => {
-    const { type } = part;
-    const key = `message-${message.id}-part-${index}`;
+  const segments: Array<
+    | { kind: "text"; text: string }
+    | {
+    kind: "tools";
+    tools: Array<{
+      toolCallId: string;
+      toolName: string;
+      state: string;
+      output?: unknown;
+    }>;
+  }
+    | { kind: "spec" }
+  > = [];
 
+  let specInserted = false;
+
+  for (const part of message.parts) {
+    if (part.type === "text") {
+      if (!part.text.trim()) continue;
+      const last = segments[segments.length - 1];
+      if (last?.kind === "text") {
+        last.text += part.text;
+      } else {
+        segments.push({ kind: "text", text: part.text });
+      }
+    } else if (part.type.startsWith("tool-")) {
+      const tp = part as {
+        type: string;
+        toolCallId: string;
+        state: string;
+        output?: unknown;
+      };
+      const last = segments[segments.length - 1];
+      if (last?.kind === "tools") {
+        last.tools.push({
+          toolCallId: tp.toolCallId,
+          toolName: tp.type.replace(/^tool-/, ""),
+          state: tp.state,
+          output: tp.output,
+        });
+      } else {
+        segments.push({
+          kind: "tools",
+          tools: [
+            {
+              toolCallId: tp.toolCallId,
+              toolName: tp.type.replace(/^tool-/, ""),
+              state: tp.state,
+              output: tp.output,
+            },
+          ],
+        });
+      }
+    } else { // @ts-ignore
+      if (part.type === SPEC_DATA_PART_TYPE && !specInserted) {
+            // First spec data part — mark where the rendered UI should appear
+            segments.push({ kind: "spec" });
+            specInserted = true;
+          }
+    }
+  }
+
+  const parts = segments?.map((part: any, index) => {
+    const type = part.kind as any;
+    const key = `message-${message.id}-part-${index}`;
     if (type === "reasoning") {
       if (!mergedReasoning.rendered && mergedReasoning.text) {
         mergedReasoning.rendered = true;
@@ -125,15 +191,21 @@ const PurePreviewMessage = ({
         const segments = parseVisualizationBlocks(sanitizeText(part.text));
         const shouldUseSegmentRendering =
           segments.length > 1 ||
-          segments.some((s) => s.kind === "visualization");
+          segments.some((s) => s.kind === "spec");
 
+        console.log(segments, shouldUseSegmentRendering)
         if (shouldUseSegmentRendering) {
           return (
             <div className="flex flex-col gap-2" key={key}>
+              <Renderer
+                spec={spec}
+                registry={registry}
+              />
+
               {segments.map((seg, si) => {
-                if (seg.kind === "visualization" && seg.spec) {
+                if (seg.kind === "spec" && seg.spec) {
                   const vizKey = `${key}-viz-${seg.spec.root ?? si}`;
-                  return <VisualizationRenderer key={vizKey} spec={seg.spec} />;
+                  return <VisualizationRenderer key={vizKey} spec={seg.spec} loading={isLoading} />;
                 }
                 if (seg.content.trim()) {
                   const txtKey = `${key}-txt-${si}`;

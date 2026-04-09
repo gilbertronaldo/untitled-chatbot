@@ -2,10 +2,10 @@
 // Set AI_PROVIDER=vertex and configure GOOGLE_VERTEX_PROJECT to use
 // Google Vertex AI instead of OpenAI.
 export const DEFAULT_CHAT_MODEL =
-  process.env.DEFAULT_CHAT_MODEL ?? "gemini-2.5-flash";
+  process.env.DEFAULT_CHAT_MODEL ?? "gemini-2.5-pro";
 
 export const titleModel = {
-  id: process.env.DEFAULT_TITLE_MODEL ?? "gemini-2.5-flash",
+  id: process.env.DEFAULT_TITLE_MODEL ?? "gemini-2.5-pro",
   name: "Gemini 2.5 Flash",
   provider: "vertex",
   description: "Model used for generating conversation titles"
@@ -57,7 +57,7 @@ export const openaiModels: ChatModel[] = [
 
 export const vertexModels: ChatModel[] = [
   {
-    id: "gemini-2.5-flash",
+    id: "gemini-2.5-pro",
     name: "Gemini 2.5 Flash",
     provider: "vertex",
     description: "Fast and capable Gemini model with tool use",
