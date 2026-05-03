@@ -1,8 +1,13 @@
 "use client";
 import type { UseChatHelpers } from "@ai-sdk/react";
+import { SPEC_DATA_PART_TYPE } from "@json-render/core";
+import { Renderer, useJsonRenderMessage } from "@json-render/react";
+import { registry } from "@/components/chat/json-render-registry";
+import { VisualizationRenderer } from "@/components/renderers/VisualizationRenderer";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
+import { parseVisualizationResponse } from "@/lib/visualization-parser";
 import { MessageContent, MessageResponse } from "../ai-elements/message";
 import { Shimmer } from "../ai-elements/shimmer";
 import {
@@ -12,10 +17,6 @@ import {
   ToolInput,
   ToolOutput,
 } from "../ai-elements/tool";
-import {
-  parseVisualizationBlocks,
-  VisualizationRenderer,
-} from "./chart-renderer";
 import { useDataStream } from "./data-stream-provider";
 import { DocumentToolResult } from "./document";
 import { DocumentPreview } from "./document-preview";
@@ -24,9 +25,6 @@ import { MessageActions } from "./message-actions";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
-import {SPEC_DATA_PART_TYPE} from "@json-render/core";
-import {Renderer, useJsonRenderMessage} from "@json-render/react";
-import {registry} from "@/components/chat/json-render-registry";
 
 const PurePreviewMessage = ({
   addToolApprovalResponse,
@@ -60,7 +58,7 @@ const PurePreviewMessage = ({
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
-  const { spec, text, hasSpec } = useJsonRenderMessage(message.parts);
+  const { spec, hasSpec } = useJsonRenderMessage(message.parts);
 
   const hasAnyContent = message.parts?.some(
     (part) =>
@@ -107,14 +105,14 @@ const PurePreviewMessage = ({
   const segments: Array<
     | { kind: "text"; text: string }
     | {
-    kind: "tools";
-    tools: Array<{
-      toolCallId: string;
-      toolName: string;
-      state: string;
-      output?: unknown;
-    }>;
-  }
+        kind: "tools";
+        tools: Array<{
+          toolCallId: string;
+          toolName: string;
+          state: string;
+          output?: unknown;
+        }>;
+      }
     | { kind: "spec" }
   > = [];
 
@@ -122,8 +120,10 @@ const PurePreviewMessage = ({
 
   for (const part of message.parts) {
     if (part.type === "text") {
-      if (!part.text.trim()) continue;
-      const last = segments[segments.length - 1];
+      if (!part.text.trim()) {
+        continue;
+      }
+      const last = segments.at(-1);
       if (last?.kind === "text") {
         last.text += part.text;
       } else {
@@ -136,7 +136,7 @@ const PurePreviewMessage = ({
         state: string;
         output?: unknown;
       };
-      const last = segments[segments.length - 1];
+      const last = segments.at(-1);
       if (last?.kind === "tools") {
         last.tools.push({
           toolCallId: tp.toolCallId,
@@ -157,12 +157,13 @@ const PurePreviewMessage = ({
           ],
         });
       }
-    } else { // @ts-ignore
+    } else {
+      // @ts-ignore
       if (part.type === SPEC_DATA_PART_TYPE && !specInserted) {
-            // First spec data part — mark where the rendered UI should appear
-            segments.push({ kind: "spec" });
-            specInserted = true;
-          }
+        // First spec data part — mark where the rendered UI should appear
+        segments.push({ kind: "spec" });
+        specInserted = true;
+      }
     }
   }
 
@@ -188,24 +189,27 @@ const PurePreviewMessage = ({
       // ```visualization fences never reach Streamdown/Shiki (which would log
       // "Language `visualization` is not included in this bundle").
       if (message.role === "assistant") {
-        const segments = parseVisualizationBlocks(sanitizeText(part.text));
+        const segments = parseVisualizationResponse(sanitizeText(part.text));
         const shouldUseSegmentRendering =
           segments.length > 1 ||
-          segments.some((s) => s.kind === "spec");
+          segments.some((s) => s.kind === "visualization") ||
+          hasSpec;
 
-        console.log(segments, shouldUseSegmentRendering)
         if (shouldUseSegmentRendering) {
           return (
             <div className="flex flex-col gap-2" key={key}>
-              <Renderer
-                spec={spec}
-                registry={registry}
-              />
+              {hasSpec && <Renderer registry={registry} spec={spec} />}
 
               {segments.map((seg, si) => {
-                if (seg.kind === "spec" && seg.spec) {
-                  const vizKey = `${key}-viz-${seg.spec.root ?? si}`;
-                  return <VisualizationRenderer key={vizKey} spec={seg.spec} loading={isLoading} />;
+                if (seg.kind === "visualization") {
+                  const vizKey = `${key}-viz-${seg.content.slice(0, 12)}-${si}`;
+                  return (
+                    <VisualizationRenderer
+                      key={vizKey}
+                      loading={isLoading}
+                      spec={seg.visualization}
+                    />
+                  );
                 }
                 if (seg.content.trim()) {
                   const txtKey = `${key}-txt-${si}`;

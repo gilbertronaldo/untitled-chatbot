@@ -28,7 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { createHighlighter } from "shiki";
+import { bundledLanguages, createHighlighter } from "shiki";
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 // biome-ignore lint/suspicious/noBitwiseOperators: shiki bitflag check
@@ -101,7 +101,7 @@ const LineSpan = ({
 // Types
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string;
-  language: BundledLanguage;
+  language: string;
   showLineNumbers?: boolean;
 };
 
@@ -138,20 +138,40 @@ const getTokensCacheKey = (code: string, language: BundledLanguage) => {
   return `${language}:${code.length}:${start}:${end}`;
 };
 
+const LANGUAGE_ALIASES: Record<string, BundledLanguage> = {
+  plaintext: "text",
+  plain: "text",
+  text: "text",
+  txt: "text",
+  spec: "text",
+  visualization: "text",
+  jsonl: "json",
+};
+
+export const getSafeLanguage = (language?: string | null): BundledLanguage => {
+  const normalized = language?.toLowerCase().trim() ?? "text";
+  const alias = LANGUAGE_ALIASES[normalized] ?? normalized;
+  if (alias in bundledLanguages) {
+    return alias as BundledLanguage;
+  }
+  return "text";
+};
+
 const getHighlighter = (
-  language: BundledLanguage
+  language: string
 ): Promise<HighlighterGeneric<BundledLanguage, BundledTheme>> => {
-  const cached = highlighterCache.get(language);
+  const safeLanguage = getSafeLanguage(language);
+  const cached = highlighterCache.get(safeLanguage);
   if (cached) {
     return cached;
   }
 
   const highlighterPromise = createHighlighter({
-    langs: [language],
+    langs: [safeLanguage],
     themes: ["github-light", "github-dark"],
   });
 
-  highlighterCache.set(language, highlighterPromise);
+  highlighterCache.set(safeLanguage, highlighterPromise);
   return highlighterPromise;
 };
 
@@ -174,11 +194,12 @@ const createRawTokens = (code: string): TokenizedCode => ({
 // Synchronous highlight with callback for async results
 export const highlightCode = (
   code: string,
-  language: BundledLanguage,
+  language: string,
   // oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-callbacks)
   callback?: (result: TokenizedCode) => void
 ): TokenizedCode | null => {
-  const tokensCacheKey = getTokensCacheKey(code, language);
+  const safeLanguage = getSafeLanguage(language);
+  const tokensCacheKey = getTokensCacheKey(code, safeLanguage);
 
   // Return cached result if available
   const cached = tokensCache.get(tokensCacheKey);
@@ -195,11 +216,13 @@ export const highlightCode = (
   }
 
   // Start highlighting in background - fire-and-forget async pattern
-  getHighlighter(language)
+  getHighlighter(safeLanguage)
     // oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then)
     .then((highlighter) => {
       const availableLangs = highlighter.getLoadedLanguages();
-      const langToUse = availableLangs.includes(language) ? language : "text";
+      const langToUse = availableLangs.includes(safeLanguage)
+        ? safeLanguage
+        : "text";
 
       const result = highlighter.codeToTokens(code, {
         lang: langToUse,
@@ -382,7 +405,7 @@ export const CodeBlockContent = ({
   showLineNumbers = false,
 }: {
   code: string;
-  language: BundledLanguage;
+  language: string;
   showLineNumbers?: boolean;
 }) => {
   // Memoized raw tokens for immediate display

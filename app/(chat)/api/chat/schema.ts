@@ -26,12 +26,19 @@ const toolApprovalMessageSchema = z.object({
   parts: z.array(z.record(z.unknown())),
 });
 
+const datasetSchema = z.object({
+  name: z.string().min(1).max(200),
+  schema: z.string().min(1).max(10_000),
+  records: z.array(z.record(z.unknown())).max(5000),
+});
+
 export const postRequestBodySchema = z.object({
   id: z.string().uuid(),
   message: userMessageSchema.optional(),
   messages: z.array(toolApprovalMessageSchema).optional(),
   selectedChatModel: z.string(),
   selectedVisibilityType: z.enum(["public", "private"]),
+  dataset: datasetSchema.optional().nullable(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

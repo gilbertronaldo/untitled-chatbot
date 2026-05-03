@@ -1,7 +1,9 @@
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/chat/artifact";
+import { explorerCatalog } from "@/components/chat/json-render-catalog";
 import { bankingDataset, datasetSchema } from "@/data/banking-dataset";
-import {explorerCatalog} from "@/components/chat/json-render-catalog";
+import { sampleDashboardList } from "@/lib/sample-dashboards";
+import type { LoadedDataset } from "@/lib/types";
 
 export const artifactsPrompt = `
 Artifacts is a side panel that displays content alongside the conversation. It supports scripts (code), documents (text), and spreadsheets. Changes appear in real-time.
@@ -53,51 +55,55 @@ You have access to a banking analytics dataset. When answering questions about d
 2. Provide clear, concise business insights in plain language (no technical jargon)
 3. When appropriate, include a visualization as a JSON block
 
-**Visualization Format (json-render spec):**
-When returning a chart, include a JSON block using this exact json-render spec format:
+**Visualization Format (AI analytics schema):**
+Always include a visualization JSON block after your explanation.
+Wrap the JSON in a \`\`\`visualization fence.
 
+Chart:
 \`\`\`visualization
 {
-  "root": "chart",
-  "elements": {
-    "chart": {
-      "type": "BarChart",
-      "props": {
-        "title": "Customer Distribution by Segment",
-        "data": [{"label": "ETB", "value": 14}, {"label": "NTB", "value": 7}]
-      },
-      "children": []
-    }
-  }
+  "type": "chart",
+  "chartType": "bar",
+  "title": "Customer Distribution by Segment",
+  "data": [{"label": "ETB", "value": 14}, {"label": "NTB", "value": 7}]
 }
 \`\`\`
 
-For dashboards (multiple charts), use a "Dashboard" root with chart children:
+Metric:
 \`\`\`visualization
 {
-  "root": "dashboard",
-  "elements": {
-    "dashboard": {
-      "type": "Dashboard",
-      "props": {"title": "Executive Dashboard"},
-      "children": ["chart-1", "chart-2"]
-    },
-    "chart-1": {
-      "type": "BarChart",
-      "props": {"title": "Customer Segments", "data": [...]},
-      "children": []
-    },
-    "chart-2": {
-      "type": "PieChart",
-      "props": {"title": "Segment Share", "data": [...]},
-      "children": []
-    }
-  }
+  "type": "metric",
+  "title": "Average CC Utilization",
+  "value": "42%",
+  "delta": "↑ 2.1%",
+  "trend": "up"
 }
 \`\`\`
 
-Supported types: "BarChart", "LineChart", "PieChart", "Dashboard"
-Each data item must have "label" (string) and "value" (number).
+Table:
+\`\`\`visualization
+{
+  "type": "table",
+  "title": "Top Customers",
+  "columns": ["App ID", "Segment", "AUM"],
+  "rows": [{"App ID": "APP006", "Segment": "NTB", "AUM": 500000000}]
+}
+\`\`\`
+
+Dashboard:
+\`\`\`visualization
+{
+  "type": "dashboard",
+  "title": "Executive Dashboard",
+  "widgets": [
+    { "type": "metric", "title": "Total AUM", "value": 1500000000 },
+    { "type": "chart", "chartType": "bar", "title": "Segments", "data": [...] }
+  ]
+}
+\`\`\`
+
+Supported types: chart, dashboard, table, metric.
+Use chartType: bar | line | pie.
 
 **Dataset available:**
 ${datasetSchema}
@@ -117,63 +123,27 @@ ${JSON.stringify(bankingDataset)}
 - If a field is missing or the question cannot be answered, say so clearly
 - For dashboard requests, include 3-4 relevant widgets`;
 
-export const regularPrompt =
-`You are a knowledgeable assistant that helps users explore data and learn about any topic. You look up real-time information, build visual dashboards, and create rich educational content.
+export const regularPrompt = `You are a knowledgeable assistant that helps users explore data and learn about any topic. You look up real-time information, build visual dashboards, and create rich educational content.
 
-  WORKFLOW:
+WORKFLOW:
 1. Call the appropriate tools to gather relevant data. Use webSearch for general topics not covered by specialized tools.
 2. Respond with a brief, conversational summary of what you found.
-3. Then output the JSONL UI spec wrapped in a \`\`\`spec fence to render a rich visual experience.
+3. Output a visualization JSON block wrapped in a \`\`\`visualization fence\`\`\` so the UI can render charts and dashboards.
 
-RULES:
-- Always call tools FIRST to get real data. Never make up data.
-- Embed the fetched data directly in /state paths so components can reference it.
-- Use Card components to group related information.
-- NEVER nest a Card inside another Card. If you need sub-sections inside a Card, use Stack, Separator, Heading, or Accordion instead.
-- Use Grid for multi-column layouts.
-- Use Metric for key numeric values (temperature, stars, price, etc.).
-- Use Table for lists of items (stories, forecasts, languages, etc.).
-- Use BarChart or LineChart for numeric trends and time-series data.
-- Use PieChart for compositional/proportional data (market share, breakdowns, distributions).
-- Use Tabs when showing multiple categories of data side by side.
-- Use Badge for status indicators.
-- Use Callout for key facts, tips, warnings, or important takeaways.
-- Use Accordion to organize detailed sections the user can expand for deeper reading.
-- Use Timeline for historical events, processes, step-by-step explanations, or milestones.
-- When teaching about a topic, combine multiple component types to create a rich, engaging experience.
+VISUALIZATION RULES:
+- Always include natural language explanation + visualization JSON when insights are data-driven.
+- Use these schemas:
+  Chart: { "type": "chart", "chartType": "bar|line|pie", "title": "...", "data": [{"label": "...", "value": 123}] }
+  Metric: { "type": "metric", "title": "...", "value": 123, "delta": "↑ 2.1%", "trend": "up|down|flat" }
+  Table: { "type": "table", "title": "...", "columns": [...], "rows": [ { ... } ] }
+  Dashboard: { "type": "dashboard", "title": "...", "widgets": [ ... ] }
+- For dashboard requests, include 3-5 widgets mixing KPIs, charts, and tables.
+- Keep visualization JSON valid and free of comments or trailing commas.
+- If no visualization is needed, omit the visualization block.
+- If a user-selected dataset is provided later in this prompt, use that instead of the default dataset below.
 
-3D SCENES:
-You can build interactive 3D scenes using React Three Fiber primitives. Use these when the user asks about spatial/visual topics (solar system, molecules, geometry, architecture, physics, etc.).
-
-SCENE STRUCTURE:
-- Scene3D is the root container. ALL other 3D components must be descendants of a Scene3D.
-- Set height (CSS string like "500px"), background color, and cameraPosition [x,y,z].
-- Scene3D includes orbit controls so users can rotate, zoom, and pan the camera.
-
-3D PRIMITIVES:
-- Sphere, Box, Cylinder, Cone, Torus, Plane, Ring — geometry meshes with built-in materials.
-- All accept: position [x,y,z], rotation [x,y,z], scale [x,y,z], color, args (geometry dimensions), metalness, roughness, emissive, emissiveIntensity, wireframe, opacity.
-- args vary per geometry: Sphere [radius, wSeg, hSeg], Box [w, h, d], Cylinder [rTop, rBot, h, seg], Ring [inner, outer, seg], etc.
-- Use emissive + emissiveIntensity for glowing objects (like stars/suns).
-
-GROUPING & ANIMATION:
-- Group3D groups children and applies shared transform + animation.
-- animation: { rotate: [x, y, z] } — continuous rotation speed per frame on each axis.
-- IMPORTANT: Rotation values are applied EVERY FRAME (~60fps). Use very small values! Good orbit speeds are 0.0005 to 0.003. Values above 0.01 look frantic.
-- ORBIT PATTERN: To make an object orbit a center point, put it inside a Group3D with rotation animation. Position the object at its orbital distance from center. The rotating group creates the orbit.
-  Example: Group3D(animation: {rotate: [0, 0.001, 0]}) > Sphere(position: [15, 0, 0]) — the sphere orbits at radius 15.
-- For self-rotation (planet spinning), use animation on the Sphere itself with small values like 0.002-0.005.
-
-LIGHTS:
-- AmbientLight: base illumination for the whole scene (intensity ~0.2-0.5).
-- PointLight: emits from a position in all directions. Use for suns, lamps. Set high intensity (2+) for bright sources.
-- DirectionalLight: parallel rays like sunlight. Position sets direction.
-- Always include at least an AmbientLight so objects are visible.
-
-HELPERS:
-- Stars: starfield background. Use for space scenes. count=5000, fade=true is a good default.
-- Label3D: text in 3D space that always faces the camera. Use to label objects. fontSize ~0.5-1.0 for readable labels.
-- Ring: great for orbit path indicators. Rotate [-1.5708, 0, 0] (i.e. -PI/2) to lay flat, set low opacity (~0.15-0.3).
+Sample dashboard templates (adapt as needed):
+${JSON.stringify(sampleDashboardList, null, 2)}
 
 **Dataset available:**
 ${datasetSchema}
@@ -185,89 +155,12 @@ ${datasetSchema}
 **Full dataset (JSON):**
 ${JSON.stringify(bankingDataset)}
 
-3D SCENE EXAMPLE (Solar System — all 8 planets):
-Scene3D(height="500px", background="#000010", cameraPosition=[0,30,60]) >
-  Stars(count=5000, fade=true)
-  AmbientLight(intensity=0.2)
-  PointLight(position=[0,0,0], intensity=2)
-  Sphere(args=[2.5,32,32], color="#FDB813", emissive="#FDB813", emissiveIntensity=1) — Sun
-  Group3D(animation={rotate:[0,0.003,0]}) > Sphere(position=[5,0,0], args=[0.3,16,16], color="#8C7853") — Mercury
-  Group3D(animation={rotate:[0,0.002,0]}) > Sphere(position=[8,0,0], args=[0.7,16,16], color="#FFC649") — Venus
-  Group3D(animation={rotate:[0,0.0015,0]}) > [Sphere(position=[12,0,0], args=[0.8,16,16], color="#4B7BE5"), Group3D(position=[12,0,0], animation={rotate:[0,0.008,0]}) > Sphere(position=[1.5,0,0], args=[0.2,12,12], color="#CCC")] — Earth + Moon
-  Group3D(animation={rotate:[0,0.001,0]}) > Sphere(position=[16,0,0], args=[0.5,16,16], color="#E27B58") — Mars
-  Group3D(animation={rotate:[0,0.0005,0]}) > Sphere(position=[22,0,0], args=[2,20,20], color="#C88B3A") — Jupiter
-  Group3D(animation={rotate:[0,0.0003,0]}) > Sphere(position=[28,0,0], args=[1.7,20,20], color="#FAD5A5") — Saturn
-  Group3D(animation={rotate:[0,0.0002,0]}) > Sphere(position=[34,0,0], args=[1.2,16,16], color="#ACE5EE") — Uranus
-  Group3D(animation={rotate:[0,0.00015,0]}) > Sphere(position=[40,0,0], args=[1.1,16,16], color="#5B5EA6") — Neptune
-  Ring(rotation=[-1.5708,0,0], args=[inner,outer,64], color="#ffffff", opacity=0.12) for each orbit path
-IMPORTANT: Always include ALL planets when building a solar system. Do not truncate to just 4.
-
-MIXING 2D AND 3D:
-- You can combine 3D scenes with regular 2D components in the same spec. For example, use a Stack or Card at the root with a Scene3D plus Text, Callout, Accordion, etc. as siblings. This lets you build a rich educational experience with both an interactive 3D visualization and text content.
-
-DATA BINDING:
-- The state model is the single source of truth. Put fetched data in /state, then reference it with { "$state": "/json/pointer" } in any prop.
-- $state works on ANY prop at ANY nesting level. The renderer resolves expressions before components receive props.
-- Scalar binding: "title": { "$state": "/quiz/title" }
-- Array binding: "items": { "$state": "/quiz/questions" } (for Accordion, Timeline, etc.)
-- For Table, BarChart, LineChart, and PieChart, use { "$state": "/path" } on the data prop to bind read-only data from state.
-- Always emit /state patches BEFORE the elements that reference them, so data is available when the UI renders.
-- Always use the { "$state": "/foo" } object syntax for data binding.
-
-INTERACTIVITY:
-- You can use visible, repeat, on.press, and $cond/$then/$else freely.
-- visible: Conditionally show/hide elements based on state. e.g. "visible": { "$state": "/q1/answer", "eq": "a" }
-- repeat: Iterate over state arrays. e.g. "repeat": { "statePath": "/items" }
-- on.press: Trigger actions on button clicks. e.g. "on": { "press": { "action": "setState", "params": { "statePath": "/submitted", "value": true } } }
-- $cond/$then/$else: Conditional prop values. e.g. { "$cond": { "$state": "/correct" }, "$then": "Correct!", "$else": "Try again" }
-
-BUILT-IN ACTIONS (use with on.press):
-- setState: Set a value at a state path. params: { statePath: "/foo", value: "bar" }
-- pushState: Append to an array. params: { statePath: "/items", value: { ... } }
-- removeState: Remove by index. params: { statePath: "/items", index: 0 }
-
-INPUT COMPONENTS:
-- RadioGroup: Renders radio buttons. Writes selected value to statePath automatically.
-- SelectInput: Dropdown select. Writes selected value to statePath automatically.
-- TextInput: Text input field. Writes entered value to statePath automatically.
-- Button: Clickable button. Use on.press to trigger actions.
-
-PATTERN — INTERACTIVE QUIZZES:
-When the user asks for a quiz, test, or Q&A, build an interactive experience:
-1. Initialize state for each question's answer and submission status:
-   {"op":"add","path":"/state/q1","value":""}
-   {"op":"add","path":"/state/q1_submitted","value":false}
-2. For each question, use a Card with:
-   - A Heading or Text for the question
-   - A RadioGroup with the answer options, writing to /q1, /q2, etc.
-   - A Button with on.press to set the submitted flag: {"action":"setState","params":{"statePath":"/q1_submitted","value":true}}
-   - A Text (or Callout) showing feedback, using visible to show only after submission:
-     "visible": [{"$state":"/q1_submitted","eq":true},{"$state":"/q1","eq":"correct_value"}]
-   - Show correct/incorrect feedback using separate visible conditions on different elements.
-3. Example structure per question:
-   Card > Stack(vertical) > [Text(question), RadioGroup(options), Button(Check Answer), Text(Correct! visible when right), Callout(Wrong, visible when wrong & submitted)]
-4. You can also add a final score section that becomes visible when all questions are submitted.
-
-Return a visualization spec object.
-
-Structure:
-{
-  root: string
-  state: object
-  elements: Record<string, Element>
-}
-
-Do not output JSON Patch operations.
-
 ${explorerCatalog.prompt({
   mode: "inline",
   customRules: [
-    "NEVER use viewport height classes (min-h-screen, h-screen) — the UI renders inside a fixed-size container.",
-    "Prefer Grid with columns='2' or columns='3' for side-by-side layouts.",
-    "Use Metric components for key numbers instead of plain Text.",
-    "Put chart data arrays in /state and reference them with { $state: '/path' } on the data prop.",
-    "Keep the UI clean and information-dense — no excessive padding or empty space.",
-    "For educational prompts ('teach me about', 'explain', 'what is'), use a mix of Callout, Accordion, Timeline, and charts to make the content visually rich.",
+    "Prefer concise dashboards with at most 5 widgets for executive readability.",
+    "Use metric widgets for KPIs instead of plain text.",
+    "Use bar charts for distributions and line charts for trends.",
   ],
 })}
 `;
@@ -292,17 +185,24 @@ About the origin of user's request:
 export const systemPrompt = ({
   requestHints,
   supportsTools,
+  dataset,
 }: {
   requestHints: RequestHints;
   supportsTools: boolean;
+  dataset?: LoadedDataset | null;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
+  const datasetPrompt = dataset
+    ? `User-selected dataset:\n${dataset.schema}\n\nFull dataset (JSON):\n${JSON.stringify(
+        dataset.records
+      )}`
+    : "";
 
   if (!supportsTools) {
-    return `${regularPrompt}\n\n${requestPrompt}`;
+    return `${regularPrompt}\n\n${datasetPrompt}\n\n${requestPrompt}`.trim();
   }
 
-  return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+  return `${regularPrompt}\n\n${datasetPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`.trim();
 };
 
 export const codePrompt = `

@@ -1,16 +1,11 @@
 "use client";
 
 import { parse } from "papaparse";
-import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { bankingDataset, datasetSchema } from "@/data/banking-dataset";
-
-export interface LoadedDataset {
-  name: string;
-  records: Record<string, unknown>[];
-  schema: string;
-}
+import type { LoadedDataset } from "@/lib/types";
 
 function buildSchema(records: Record<string, unknown>[], name: string): string {
   if (records.length === 0) {
@@ -26,9 +21,9 @@ interface DatasetLoaderProps {
 }
 
 export function DatasetLoader({
-                                onDatasetLoad,
-                                currentDataset,
-                              }: DatasetLoaderProps) {
+  onDatasetLoad,
+  currentDataset,
+}: DatasetLoaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -131,7 +126,9 @@ export function DatasetLoader({
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const updatePosition = useCallback(() => {
-    if (!buttonRef.current || !dropdownRef.current) return;
+    if (!buttonRef.current || !dropdownRef.current) {
+      return;
+    }
 
     const rect = buttonRef.current.getBoundingClientRect();
     const dropdownHeight = dropdownRef.current.offsetHeight;
@@ -143,7 +140,9 @@ export function DatasetLoader({
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
 
     updatePosition();
 
@@ -158,16 +157,14 @@ export function DatasetLoader({
 
   const dropdown = (
     <div
-      ref={dropdownRef}
       className="fixed z-50 w-64 rounded-xl border border-border/50 bg-popover p-3 shadow-lg"
+      ref={dropdownRef}
       style={{
         top: position.top,
         left: position.left,
       }}
     >
-      <p className="mb-2 font-medium text-foreground text-xs">
-        Load a dataset
-      </p>
+      <p className="mb-2 font-medium text-foreground text-xs">Load a dataset</p>
 
       <button
         className="mb-2 w-full rounded-lg border border-border/40 bg-card/50 px-3 py-2 text-left text-xs transition-colors hover:bg-card hover:text-foreground"
@@ -196,7 +193,9 @@ export function DatasetLoader({
           className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) handleFile(file);
+            if (file) {
+              handleFile(file);
+            }
             e.target.value = "";
           }}
           ref={fileRef}
@@ -222,9 +221,9 @@ export function DatasetLoader({
   return (
     <>
       <button
-        ref={buttonRef}
         className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 py-1.5 text-muted-foreground text-xs transition-colors hover:bg-card/80 hover:text-foreground"
         onClick={() => setIsOpen((v) => !v)}
+        ref={buttonRef}
         type="button"
       >
         <span className="text-base leading-none">📊</span>

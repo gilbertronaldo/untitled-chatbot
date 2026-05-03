@@ -25,7 +25,7 @@ import { useAutoResume } from "@/hooks/use-auto-resume";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, LoadedDataset } from "@/lib/types";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 
 type ActiveChatContextValue = {
@@ -47,6 +47,8 @@ type ActiveChatContextValue = {
   setCurrentModelId: (id: string) => void;
   showCreditCardAlert: boolean;
   setShowCreditCardAlert: Dispatch<SetStateAction<boolean>>;
+  activeDataset: LoadedDataset | null;
+  setActiveDataset: Dispatch<SetStateAction<LoadedDataset | null>>;
 };
 
 const ActiveChatContext = createContext<ActiveChatContextValue | null>(null);
@@ -81,6 +83,14 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
 
   const [input, setInput] = useState("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
+  const [activeDataset, setActiveDataset] = useState<LoadedDataset | null>(
+    null
+  );
+  const activeDatasetRef = useRef(activeDataset);
+
+  useEffect(() => {
+    activeDatasetRef.current = activeDataset;
+  }, [activeDataset]);
 
   const { data: chatData, isLoading } = useSWR(
     isNewChat
@@ -146,6 +156,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
               : { message: lastMessage }),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibility,
+            dataset: activeDatasetRef.current,
             ...request.body,
           },
         };
@@ -264,6 +275,8 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       setCurrentModelId,
       showCreditCardAlert,
       setShowCreditCardAlert,
+      activeDataset,
+      setActiveDataset,
     }),
     [
       chatId,
@@ -282,6 +295,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       votes,
       currentModelId,
       showCreditCardAlert,
+      activeDataset,
     ]
   );
 

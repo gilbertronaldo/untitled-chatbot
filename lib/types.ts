@@ -53,3 +53,9 @@ export type Attachment = {
   url: string;
   contentType: string;
 };
+
+export type LoadedDataset = {
+  name: string;
+  records: Record<string, unknown>[];
+  schema: string;
+};
