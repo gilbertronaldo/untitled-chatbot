@@ -190,19 +190,20 @@ const PurePreviewMessage = ({
       if (message.role === "assistant") {
         const segments = parseVisualizationBlocks(sanitizeText(part.text));
         const shouldUseSegmentRendering =
-          segments.length > 1 ||
+          segments.length >= 1 ||
           segments.some((s) => s.kind === "spec");
 
         console.log(segments, shouldUseSegmentRendering)
         if (shouldUseSegmentRendering) {
           return (
             <div className="flex flex-col gap-2" key={key}>
-              <Renderer
-                spec={spec}
-                registry={registry}
-              />
+              {/*<Renderer*/}
+              {/*  spec={spec}*/}
+              {/*  registry={registry}*/}
+              {/*/>*/}
 
               {segments.map((seg, si) => {
+                console.log(segments);
                 if (seg.kind === "spec" && seg.spec) {
                   const vizKey = `${key}-viz-${seg.spec.root ?? si}`;
                   return <VisualizationRenderer key={vizKey} spec={seg.spec} loading={isLoading} />;
