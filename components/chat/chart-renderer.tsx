@@ -79,10 +79,11 @@ export function parseVisualizationBlocks(text: string): Array<{
   const FENCE_RE = /```spec\n([\s\S]*?)```/g;
 
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  match = FENCE_RE.exec(text);
-  while (match !== null) {
+  for (;;) {
+    const match = FENCE_RE.exec(text);
+    if (!match) {
+      break;
+    }
     if (match.index > lastIndex) {
       segments.push({
         kind: "text",
@@ -121,7 +122,6 @@ export function parseVisualizationBlocks(text: string): Array<{
     }
 
     lastIndex = match.index + match[0].length;
-    match = FENCE_RE.exec(text);
   }
 
   if (lastIndex < text.length) {

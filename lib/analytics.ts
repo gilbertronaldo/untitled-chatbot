@@ -66,7 +66,7 @@ export function averageByGroup<T>(
 }
 
 export function utilization(balance: number, limit: number): number {
-  if (!Number.isFinite(balance) || !Number.isFinite(limit) || limit === 0) {
+  if (!Number.isFinite(balance) || !Number.isFinite(limit) || limit <= 0) {
     return 0;
   }
   return balance / limit;

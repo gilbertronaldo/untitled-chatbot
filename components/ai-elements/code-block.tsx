@@ -148,11 +148,14 @@ const LANGUAGE_ALIASES: Record<string, BundledLanguage> = {
   jsonl: "json",
 };
 
+const isBundledLanguage = (language: string): language is BundledLanguage =>
+  Object.prototype.hasOwnProperty.call(bundledLanguages, language);
+
 export const getSafeLanguage = (language?: string | null): BundledLanguage => {
   const normalized = language?.toLowerCase().trim() ?? "text";
   const alias = LANGUAGE_ALIASES[normalized] ?? normalized;
-  if (alias in bundledLanguages) {
-    return alias as BundledLanguage;
+  if (isBundledLanguage(alias)) {
+    return alias;
   }
   return "text";
 };

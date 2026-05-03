@@ -50,9 +50,9 @@ export function TableRenderer({
         </TableHeader>
         <TableBody>
           {spec.rows.map((row) => {
-            const rowKey = columns
-              .map((column) => String(row[column] ?? ""))
-              .join("|");
+            const rowKey =
+              String(row.id ?? row.app_id ?? row.appId ?? "") ||
+              columns.map((column) => String(row[column] ?? "")).join("|");
             return (
               <TableRow key={rowKey}>
                 {columns.map((column) => (

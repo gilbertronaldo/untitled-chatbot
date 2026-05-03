@@ -29,7 +29,7 @@ const toolApprovalMessageSchema = z.object({
 const datasetSchema = z.object({
   name: z.string().min(1).max(200),
   schema: z.string().min(1).max(10_000),
-  records: z.array(z.record(z.unknown())).max(5000),
+  records: z.array(z.record(z.unknown())).max(2000),
 });
 
 export const postRequestBodySchema = z.object({

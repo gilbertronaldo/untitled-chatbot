@@ -73,10 +73,11 @@ export function parseVisualizationResponse(
   const fenceRegex = /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g;
 
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  match = fenceRegex.exec(text);
-  while (match !== null) {
+  for (;;) {
+    const match = fenceRegex.exec(text);
+    if (!match) {
+      break;
+    }
     if (match.index > lastIndex) {
       const plain = text.slice(lastIndex, match.index);
       segments.push(...splitPlainJsonSegments(plain));
@@ -101,7 +102,6 @@ export function parseVisualizationResponse(
     }
 
     lastIndex = match.index + match[0].length;
-    match = fenceRegex.exec(text);
   }
 
   if (lastIndex < text.length) {
