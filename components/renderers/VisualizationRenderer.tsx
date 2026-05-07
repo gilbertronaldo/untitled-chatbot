@@ -56,12 +56,12 @@ export function JsonRenderVisualizationRenderer({
   spec,
   loading = false,
 }: {
-  spec: Spec;
+  spec: Spec | null;
   loading?: boolean;
 }) {
   return (
     <VisualizationErrorBoundary>
-      <StateProvider initialState={spec.state ?? {}}>
+      <StateProvider initialState={spec?.state ?? {}}>
         <VisibilityProvider>
           <ActionProvider>
             <Renderer

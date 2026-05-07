@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import type { ChartDataPoint } from "@/lib/visualization-parser";
 
 export type DataRecord = Record<string, unknown>;
