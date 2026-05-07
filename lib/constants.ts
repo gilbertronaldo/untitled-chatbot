@@ -17,4 +17,9 @@ export const suggestions = [
   "Show AUM distribution",
   "Create risk dashboard",
   "Show CC utilization distribution",
+  "Create executive dashboard",
+  "Create credit risk dashboard",
+  "Create customer segment dashboard",
+  "Create payroll overview dashboard",
+  "Create credit utilization dashboard",
 ];

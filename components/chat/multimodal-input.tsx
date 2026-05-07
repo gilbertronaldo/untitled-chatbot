@@ -42,7 +42,7 @@ import {
   DEFAULT_CHAT_MODEL,
   type ModelCapabilities,
 } from "@/lib/ai/models";
-import type { Attachment, ChatMessage } from "@/lib/types";
+import type { Attachment, ChatMessage, LoadedDataset } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
@@ -52,7 +52,7 @@ import {
   PromptInputTools,
 } from "../ai-elements/prompt-input";
 import { Button } from "../ui/button";
-import { DatasetLoader, type LoadedDataset } from "./dataset-loader";
+import { DatasetLoader } from "./dataset-loader";
 import { PaperclipIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
 import {
@@ -78,6 +78,8 @@ function PureMultimodalInput({
   attachments,
   setAttachments,
   messages,
+  activeDataset,
+  setActiveDataset,
   setMessages,
   sendMessage,
   className,
@@ -96,6 +98,8 @@ function PureMultimodalInput({
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   messages: UIMessage[];
+  activeDataset: LoadedDataset | null;
+  setActiveDataset: Dispatch<SetStateAction<LoadedDataset | null>>;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   sendMessage:
     | UseChatHelpers<ChatMessage>["sendMessage"]
@@ -113,9 +117,6 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const hasAutoFocused = useRef(false);
-  const [activeDataset, setActiveDataset] = useState<LoadedDataset | null>(
-    null
-  );
   useEffect(() => {
     if (!hasAutoFocused.current && width) {
       const timer = setTimeout(() => {

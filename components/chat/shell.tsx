@@ -41,6 +41,8 @@ export function ChatShell() {
     visibilityType,
     isReadonly,
     isLoading,
+    activeDataset,
+    setActiveDataset,
     votes,
     currentModelId,
     setCurrentModelId,
@@ -110,6 +112,7 @@ export function ChatShell() {
             <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
               {!isReadonly && (
                 <MultimodalInput
+                  activeDataset={activeDataset}
                   attachments={attachments}
                   chatId={chatId}
                   editingMessage={editingMessage}
@@ -138,6 +141,7 @@ export function ChatShell() {
                         }
                       : sendMessage
                   }
+                  setActiveDataset={setActiveDataset}
                   setAttachments={setAttachments}
                   setInput={setInput}
                   setMessages={setMessages}
