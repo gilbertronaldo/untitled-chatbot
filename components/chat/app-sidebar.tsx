@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Database,
   LayoutDashboard,
   MessageSquareIcon,
   PanelLeftIcon,
@@ -117,6 +118,20 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                     {/*Dashboard Icon*/}
                     <LayoutDashboard className="size-4" />
                     <span className="font-medium">Dashboard</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="h-8 rounded-lg border border-sidebar-border text-[13px] text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    onClick={() => {
+                      setOpenMobile(false);
+                      router.push("/dashboard/data-warehouse");
+                    }}
+                    tooltip="Data Warehouse"
+                  >
+                    {/*Dashboard Icon*/}
+                    <Database className="size-4" />
+                    <span className="font-medium">Data Warehouse</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
