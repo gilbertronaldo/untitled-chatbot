@@ -107,9 +107,12 @@ export function parseVisualizationResponse(
           visualization: parsed,
         });
       } else {
-        console.error("[visualization] Ignoring malformed visualization fence", {
-          raw: raw.slice(0, 1000),
-        });
+        console.error(
+          "[visualization] Ignoring malformed visualization fence",
+          {
+            raw: raw.slice(0, 1000),
+          }
+        );
       }
     } else {
       segments.push({ kind: "text", content: match[0] });
@@ -158,9 +161,12 @@ function parseTaggedSegments(text: string): VisualizationSegment[] | null {
 
     const jsonBlock = extractJsonOnly(rawBlock);
     if (!jsonBlock) {
-      console.error("[visualization] Visualization block did not contain JSON", {
-        raw: rawBlock.slice(0, 1000),
-      });
+      console.error(
+        "[visualization] Visualization block did not contain JSON",
+        {
+          raw: rawBlock.slice(0, 1000),
+        }
+      );
       continue;
     }
 
@@ -289,7 +295,10 @@ function safeParseVisualization(raw: string): VisualizationSpec | null {
 
       const normalized = normalizeVisualizationSpec(parsed);
       if (normalized) {
-        console.debug("[visualization] Parsed visualization result", normalized);
+        console.debug(
+          "[visualization] Parsed visualization result",
+          normalized
+        );
         return normalized;
       }
 

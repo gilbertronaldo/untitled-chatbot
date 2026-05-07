@@ -64,7 +64,7 @@ You have access to a banking analytics dataset. When answering questions about d
 - Never place explanation text inside \`<visualization>\`.
 - Never output partial JSON.
 - Never duplicate visualization objects.
-- For chart visualizations, always provide \`type\`, \`chartType\`, \`title\`, and a \`data\` array of \`{ \"label\": string, \"value\": number }\` objects.
+- For chart visualizations, always provide \`type\`, \`chartType\`, \`title\`, and a \`data\` array of \`{ "label": string, "value": number }\` objects.
 
 Chart:
 <analysis>

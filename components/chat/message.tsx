@@ -159,13 +159,11 @@ const PurePreviewMessage = ({
           ],
         });
       }
-    } else {
-      // @ts-ignore
-      if (part.type === SPEC_DATA_PART_TYPE && !specInserted) {
-        // First spec data part — mark where the rendered UI should appear
-        segments.push({ kind: "spec" });
-        specInserted = true;
-      }
+      // @ts-expect-error SPEC_DATA_PART_TYPE is injected at runtime by json-render.
+    } else if (part.type === SPEC_DATA_PART_TYPE && !specInserted) {
+      // First spec data part — mark where the rendered UI should appear
+      segments.push({ kind: "spec" });
+      specInserted = true;
     }
   }
 
