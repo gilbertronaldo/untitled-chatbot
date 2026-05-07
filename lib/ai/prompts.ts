@@ -2,6 +2,8 @@ import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/chat/artifact";
 import { explorerCatalog } from "@/components/chat/json-render-catalog";
 import { bankingDataset, datasetSchema } from "@/data/banking-dataset";
+import { ecommerceDatasetSchema } from "@/data/ecommerce-dataset";
+import { educationDatasetSchema } from "@/data/education-dataset";
 import { sampleDashboardList } from "@/lib/sample-dashboards";
 import type { LoadedDataset } from "@/lib/types";
 
@@ -134,13 +136,18 @@ VISUALIZATION RULES:
 - Always include natural language explanation + visualization JSON when insights are data-driven.
 - Use these schemas:
   Chart: { "type": "chart", "chartType": "bar|line|pie", "title": "...", "data": [{"label": "...", "value": 123}] }
-  Metric: { "type": "metric", "title": "...", "value": 123, "delta": "↑ 2.1%", "trend": "up|down|flat" }
+  KPI/Metric: { "type": "metric", "title": "...", "value": 123, "delta": "↑ 2.1%", "trend": "up|down|flat" }
   Table: { "type": "table", "title": "...", "columns": [...], "rows": [ { ... } ] }
   Dashboard: { "type": "dashboard", "title": "...", "widgets": [ ... ] }
 - For dashboard requests, include 3-5 widgets mixing KPIs, charts, and tables.
 - Keep visualization JSON valid and free of comments or trailing commas.
 - If no visualization is needed, omit the visualization block.
 - If a user-selected dataset is provided later in this prompt, use that instead of the default dataset below.
+- For dataset questions, compute directly from provided rows (count, sum, average, grouping, and trend over time where available).
+
+RESPONSE FORMAT:
+1) 1-4 short sentences with business insight.
+2) If data-driven, then a \`\`\`visualization fenced JSON block containing exactly one valid JSON object.
 
 Sample dashboard templates (adapt as needed):
 ${JSON.stringify(sampleDashboardList, null, 2)}
@@ -155,6 +162,10 @@ ${datasetSchema}
 **Full dataset (JSON):**
 ${JSON.stringify(bankingDataset)}
 
+Additional demo datasets (use only if requested by user or selected in chat):
+- ${ecommerceDatasetSchema}
+- ${educationDatasetSchema}
+
 ${explorerCatalog.prompt({
   mode: "inline",
   customRules: [
@@ -164,8 +175,6 @@ ${explorerCatalog.prompt({
   ],
 })}
 `;
-
-console.log("System prompt:", regularPrompt);
 
 export type RequestHints = {
   latitude: Geo["latitude"];

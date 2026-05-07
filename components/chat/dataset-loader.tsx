@@ -5,14 +5,66 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { bankingDataset, datasetSchema } from "@/data/banking-dataset";
+import {
+  ecommerceDataset,
+  ecommerceDatasetSchema,
+} from "@/data/ecommerce-dataset";
+import {
+  educationDataset,
+  educationDatasetSchema,
+} from "@/data/education-dataset";
 import type { LoadedDataset } from "@/lib/types";
 
-function buildSchema(records: Record<string, unknown>[], name: string): string {
+function buildSchema(records: Record<string, unknown>[], name: string) {
   if (records.length === 0) {
     return `Dataset: ${name} (0 records)`;
   }
-  const fields = Object.keys(records[0]);
-  return `Dataset: ${name} (${records.length} records)\nFields: ${fields.join(", ")}`;
+
+  const fields = Array.from(
+    new Set(records.flatMap((record) => Object.keys(record)))
+  ).slice(0, 30);
+  const typeHints = fields.map((field) => {
+    const values = records
+      .map((record) => record[field])
+      .filter((value) => value !== null && value !== undefined)
+      .slice(0, 100);
+    const numericCount = values.filter((value) => {
+      if (typeof value === "number") {
+        return Number.isFinite(value);
+      }
+      if (typeof value === "string") {
+        return value.trim() !== "" && Number.isFinite(Number(value));
+      }
+      return false;
+    }).length;
+    return `- ${field}: ${numericCount >= Math.max(1, values.length * 0.7) ? "number-like" : "text/categorical"}`;
+  });
+
+  const sample = records.slice(0, 5);
+  return `Dataset: ${name} (${records.length} records)\nFields:\n${typeHints.join("\n")}\nSample rows:\n${JSON.stringify(sample, null, 2)}`;
+}
+
+function normalizeRecordValues(record: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => {
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (trimmed === "") {
+          return [key, null];
+        }
+        const numericCandidate = trimmed.replace(/,/g, "");
+        const parsed = Number(numericCandidate);
+        if (
+          Number.isFinite(parsed) &&
+          /^-?\d+(\.\d+)?$/.test(numericCandidate)
+        ) {
+          return [key, parsed];
+        }
+        return [key, trimmed];
+      }
+      return [key, value];
+    })
+  );
 }
 
 interface DatasetLoaderProps {
@@ -44,13 +96,29 @@ export function DatasetLoader({
   }, [isOpen]);
 
   const loadExample = useCallback(() => {
-    const dataset: LoadedDataset = {
+    onDatasetLoad({
       name: "Banking Analytics Sample",
       records: bankingDataset as unknown as Record<string, unknown>[],
       schema: datasetSchema,
-    };
+    });
+    setIsOpen(false);
+  }, [onDatasetLoad]);
 
-    onDatasetLoad(dataset);
+  const loadEcommerce = useCallback(() => {
+    onDatasetLoad({
+      name: "Ecommerce Sales Sample",
+      records: ecommerceDataset as unknown as Record<string, unknown>[],
+      schema: ecommerceDatasetSchema,
+    });
+    setIsOpen(false);
+  }, [onDatasetLoad]);
+
+  const loadEducation = useCallback(() => {
+    onDatasetLoad({
+      name: "Education Performance Sample",
+      records: educationDataset as unknown as Record<string, unknown>[],
+      schema: educationDatasetSchema,
+    });
     setIsOpen(false);
   }, [onDatasetLoad]);
 
@@ -68,10 +136,12 @@ export function DatasetLoader({
 
             const raw = Array.isArray(parsed) ? parsed : [parsed];
 
-            const records = raw.filter(
-              (r): r is Record<string, unknown> =>
-                r !== null && typeof r === "object" && !Array.isArray(r)
-            );
+            const records = raw
+              .filter(
+                (r): r is Record<string, unknown> =>
+                  r !== null && typeof r === "object" && !Array.isArray(r)
+              )
+              .map((record) => normalizeRecordValues(record));
 
             if (records.length === 0) {
               toast.error("JSON file must contain an array of objects.");
@@ -104,10 +174,20 @@ export function DatasetLoader({
             { header: true, skipEmptyLines: true }
           );
 
+          const records = result.data
+            .map((record) => normalizeRecordValues(record))
+            .filter((record) => Object.keys(record).length > 0);
+
+          if (records.length === 0) {
+            toast.error("CSV file has no valid rows.");
+            setIsLoading(false);
+            return;
+          }
+
           const dataset: LoadedDataset = {
             name: file.name,
-            records: result.data,
-            schema: buildSchema(result.data, file.name),
+            records,
+            schema: buildSchema(records, file.name),
           };
 
           onDatasetLoad(dataset);
@@ -175,6 +255,30 @@ export function DatasetLoader({
         <br />
         <span className="text-muted-foreground">
           25 records – segments, AUM, credit data
+        </span>
+      </button>
+
+      <button
+        className="mb-2 w-full rounded-lg border border-border/40 bg-card/50 px-3 py-2 text-left text-xs transition-colors hover:bg-card hover:text-foreground"
+        onClick={loadEcommerce}
+        type="button"
+      >
+        <span className="font-medium">Ecommerce Sales Sample</span>
+        <br />
+        <span className="text-muted-foreground">
+          Orders, channels, regions, revenue trend
+        </span>
+      </button>
+
+      <button
+        className="mb-2 w-full rounded-lg border border-border/40 bg-card/50 px-3 py-2 text-left text-xs transition-colors hover:bg-card hover:text-foreground"
+        onClick={loadEducation}
+        type="button"
+      >
+        <span className="font-medium">Education Performance Sample</span>
+        <br />
+        <span className="text-muted-foreground">
+          Attendance and multi-subject score trend
         </span>
       </button>
 

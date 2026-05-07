@@ -1,11 +1,81 @@
 "use client";
 
+import type { Spec } from "@json-render/core";
+import {
+  ActionProvider,
+  type ComponentRenderer,
+  Renderer,
+  StateProvider,
+  VisibilityProvider,
+} from "@json-render/react";
+import { Component, type ReactNode } from "react";
+import { Fallback, registry } from "@/components/chat/json-render-registry";
 import { ChartRenderer } from "@/components/renderers/ChartRenderer";
 import { DashboardRenderer } from "@/components/renderers/DashboardRenderer";
 import { KPIWidget } from "@/components/renderers/KPIWidget";
 import { TableRenderer } from "@/components/renderers/TableRenderer";
 import { cn } from "@/lib/utils";
 import type { VisualizationSpec } from "@/lib/visualization-parser";
+
+const jsonRenderFallback: ComponentRenderer = ({ element }) => (
+  <Fallback type={element.type} />
+);
+
+class VisualizationErrorBoundary extends Component<
+  { children: ReactNode; fallback?: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error("[visualization] Renderer crashed", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback ?? (
+          <p className="text-muted-foreground text-xs">
+            Visualization unavailable.
+          </p>
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export function JsonRenderVisualizationRenderer({
+  spec,
+  loading = false,
+}: {
+  spec: Spec;
+  loading?: boolean;
+}) {
+  return (
+    <VisualizationErrorBoundary>
+      <StateProvider initialState={spec.state ?? {}}>
+        <VisibilityProvider>
+          <ActionProvider>
+            <Renderer
+              fallback={jsonRenderFallback}
+              loading={loading}
+              registry={registry}
+              spec={spec}
+            />
+          </ActionProvider>
+        </VisibilityProvider>
+      </StateProvider>
+    </VisualizationErrorBoundary>
+  );
+}
 
 export function VisualizationRenderer({
   spec,
@@ -93,9 +163,21 @@ export function VisualizationRenderer({
   };
 
   return (
-    <div className={wrapperClass}>
-      <div className={containerClass}>{renderContent()}</div>
-    </div>
+    <VisualizationErrorBoundary
+      fallback={
+        <div className={wrapperClass}>
+          <div className={containerClass}>
+            <p className="text-muted-foreground text-xs">
+              Unable to render visualization.
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <div className={wrapperClass}>
+        <div className={containerClass}>{renderContent()}</div>
+      </div>
+    </VisualizationErrorBoundary>
   );
 }
 
