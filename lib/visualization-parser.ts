@@ -9,7 +9,7 @@ export type ChartDataPoint = {
 export type ChartSpec = {
   type: "chart";
   chartType: ChartType;
-  title?: string;
+  title: string;
   data: ChartDataPoint[];
 };
 
@@ -62,11 +62,23 @@ const LANGUAGE_HINTS = new Set([
   "kpi",
 ]);
 
+const STRUCTURED_BLOCK_REGEX =
+  /<(analysis|visualization)>([\s\S]*?)<\/(analysis|visualization)>/gi;
+
 export function parseVisualizationResponse(
   text: string
 ): VisualizationSegment[] {
+  console.debug("[visualization] Raw AI response", {
+    raw: text.slice(0, 4000),
+  });
+
   if (!text.trim()) {
     return [{ kind: "text", content: text }];
+  }
+
+  const taggedSegments = parseTaggedSegments(text);
+  if (taggedSegments !== null) {
+    return finalizeSegments(taggedSegments, "");
   }
 
   const segments: VisualizationSegment[] = [];
@@ -109,16 +121,63 @@ export function parseVisualizationResponse(
     segments.push(...splitPlainJsonSegments(remainder));
   }
 
-  const cleaned = segments.filter(
-    (segment) =>
-      segment.content.trim().length > 0 || segment.kind === "visualization"
-  );
+  return finalizeSegments(segments, text);
+}
 
-  return cleaned.length > 0 ? cleaned : [{ kind: "text", content: text }];
+function parseTaggedSegments(text: string): VisualizationSegment[] | null {
+  STRUCTURED_BLOCK_REGEX.lastIndex = 0;
+
+  const matches = [...text.matchAll(STRUCTURED_BLOCK_REGEX)];
+  if (matches.length === 0) {
+    return null;
+  }
+
+  const segments: VisualizationSegment[] = [];
+
+  for (const match of matches) {
+    const openingTag = match[1]?.toLowerCase();
+    const closingTag = match[3]?.toLowerCase();
+    if (!openingTag || openingTag !== closingTag) {
+      continue;
+    }
+
+    const rawBlock = match[2]?.trim() ?? "";
+
+    if (openingTag === "analysis") {
+      if (rawBlock) {
+        segments.push({ kind: "text", content: rawBlock });
+      }
+      continue;
+    }
+
+    console.debug("[visualization] Extracted visualization block", {
+      raw: rawBlock.slice(0, 4000),
+    });
+
+    const jsonBlock = extractJsonOnly(rawBlock);
+    if (!jsonBlock) {
+      console.error("[visualization] Visualization block did not contain JSON", {
+        raw: rawBlock.slice(0, 1000),
+      });
+      continue;
+    }
+
+    const parsed = safeParseVisualization(jsonBlock);
+    if (parsed) {
+      segments.push({
+        kind: "visualization",
+        content: jsonBlock,
+        visualization: parsed,
+      });
+    }
+  }
+
+  return segments;
 }
 
 function splitPlainJsonSegments(text: string): VisualizationSegment[] {
-  if (!text.includes("{")) {
+  const start = findNextJsonStart(text);
+  if (start === -1) {
     return [{ kind: "text", content: text }];
   }
 
@@ -126,19 +185,19 @@ function splitPlainJsonSegments(text: string): VisualizationSegment[] {
   let cursor = 0;
 
   while (cursor < text.length) {
-    const start = text.indexOf("{", cursor);
-    if (start === -1) {
+    const nextStart = findNextJsonStart(text, cursor);
+    if (nextStart === -1) {
       segments.push({ kind: "text", content: text.slice(cursor) });
       break;
     }
 
-    if (start > cursor) {
-      segments.push({ kind: "text", content: text.slice(cursor, start) });
+    if (nextStart > cursor) {
+      segments.push({ kind: "text", content: text.slice(cursor, nextStart) });
     }
 
-    const extraction = extractBalancedJson(text, start);
+    const extraction = extractBalancedJsonValue(text, nextStart);
     if (!extraction) {
-      segments.push({ kind: "text", content: text.slice(start) });
+      segments.push({ kind: "text", content: text.slice(nextStart) });
       break;
     }
 
@@ -159,11 +218,21 @@ function splitPlainJsonSegments(text: string): VisualizationSegment[] {
   return segments;
 }
 
-function extractBalancedJson(
+function extractJsonOnly(raw: string): string | null {
+  const startIndex = findNextJsonStart(raw);
+  if (startIndex === -1) {
+    return null;
+  }
+
+  const extraction = extractBalancedJsonValue(raw, startIndex);
+  return extraction?.json ?? null;
+}
+
+function extractBalancedJsonValue(
   text: string,
   startIndex: number
 ): { json: string; end: number } | null {
-  let depth = 0;
+  const stack: string[] = [];
   let inString = false;
   let escaped = false;
 
@@ -185,11 +254,18 @@ function extractBalancedJson(
       continue;
     }
 
-    if (char === "{") {
-      depth += 1;
-    } else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
+    if (char === "{" || char === "[") {
+      stack.push(char);
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      const expected = char === "}" ? "{" : "[";
+      if (stack.at(-1) !== expected) {
+        return null;
+      }
+      stack.pop();
+      if (stack.length === 0) {
         return { json: text.slice(startIndex, i + 1), end: i + 1 };
       }
     }
@@ -207,18 +283,27 @@ function safeParseVisualization(raw: string): VisualizationSpec | null {
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate);
+      console.debug("[visualization] Parsed JSON result", parsed);
+
       const normalized = normalizeVisualizationSpec(parsed);
       if (normalized) {
-        console.debug("[visualization] Parsed visualization block", normalized);
+        console.debug("[visualization] Parsed visualization result", normalized);
         return normalized;
       }
-    } catch (_error) {
-      continue;
+
+      console.error("[visualization] Visualization schema validation failed", {
+        parsed,
+      });
+    } catch (error) {
+      console.error("[visualization] Failed to parse visualization JSON", {
+        candidate: candidate.slice(0, 1000),
+        error: getErrorMessage(error),
+      });
     }
   }
 
-  console.debug("[visualization] Failed to parse visualization JSON", {
-    raw: raw.slice(0, 400),
+  console.error("[visualization] Failed to parse visualization block", {
+    raw: raw.slice(0, 1000),
   });
 
   return null;
@@ -274,13 +359,12 @@ function normalizeVisualizationSpec(value: unknown): VisualizationSpec | null {
 }
 
 function normalizeChartSpec(value: Record<string, unknown>): ChartSpec | null {
-  const chartType = normalizeChartType(
-    value.chartType ?? value.chart ?? value.kind
-  );
+  const rawChartType = value.chartType ?? value.chart ?? value.kind;
+  const chartTypeName = stringOrUndefined(rawChartType);
   const title = stringOrUndefined(value.title ?? value.name);
   const rawData = value.data ?? value.series ?? value.values;
 
-  if (!Array.isArray(rawData)) {
+  if (!chartTypeName || !title || !Array.isArray(rawData)) {
     return null;
   }
 
@@ -312,7 +396,7 @@ function normalizeChartSpec(value: Record<string, unknown>): ChartSpec | null {
     })
     .filter(Boolean) as ChartDataPoint[];
 
-  if (data.length === 0 && Array.isArray(rawData)) {
+  if (data.length === 0) {
     const categoryKey = stringOrUndefined(
       value.xKey ?? value.categoryKey ?? value.labelKey
     );
@@ -342,7 +426,7 @@ function normalizeChartSpec(value: Record<string, unknown>): ChartSpec | null {
 
   return {
     type: "chart",
-    chartType,
+    chartType: normalizeChartType(chartTypeName),
     title,
     data,
   };
@@ -540,9 +624,9 @@ function collectJsonCandidates(raw: string): string[] {
 
   const candidates = new Set<string>([trimmed]);
 
-  const firstBrace = trimmed.indexOf("{");
-  if (firstBrace >= 0) {
-    const balanced = extractBalancedJson(trimmed, firstBrace);
+  const firstJsonStart = findNextJsonStart(trimmed);
+  if (firstJsonStart >= 0) {
+    const balanced = extractBalancedJsonValue(trimmed, firstJsonStart);
     if (balanced) {
       candidates.add(balanced.json);
     }
@@ -559,4 +643,65 @@ function collectJsonCandidates(raw: string): string[] {
   }
 
   return [...candidates];
+}
+
+function findNextJsonStart(text: string, startIndex = 0): number {
+  const objectStart = text.indexOf("{", startIndex);
+  const arrayStart = text.indexOf("[", startIndex);
+
+  if (objectStart === -1) {
+    return arrayStart;
+  }
+
+  if (arrayStart === -1) {
+    return objectStart;
+  }
+
+  return Math.min(objectStart, arrayStart);
+}
+
+function finalizeSegments(
+  segments: VisualizationSegment[],
+  fallbackText: string
+): VisualizationSegment[] {
+  const cleaned = dedupeVisualizations(segments).filter(
+    (segment) =>
+      segment.kind === "visualization" || segment.content.trim().length > 0
+  );
+
+  if (cleaned.length > 0) {
+    return cleaned;
+  }
+
+  return [{ kind: "text", content: fallbackText }];
+}
+
+function dedupeVisualizations(
+  segments: VisualizationSegment[]
+): VisualizationSegment[] {
+  const seen = new Set<string>();
+
+  return segments.filter((segment) => {
+    if (segment.kind !== "visualization") {
+      return true;
+    }
+
+    const signature = JSON.stringify(segment.visualization);
+    if (seen.has(signature)) {
+      console.debug("[visualization] Dropped duplicate visualization", {
+        signature,
+      });
+      return false;
+    }
+
+    seen.add(signature);
+    return true;
+  });
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
