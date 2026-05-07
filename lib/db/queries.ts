@@ -79,11 +79,13 @@ export async function saveChat({
   userId,
   title,
   visibility,
+  dataset,
 }: {
   id: string;
   userId: string;
   title: string;
   visibility: VisibilityType;
+  dataset?: typeof chat.$inferInsert.dataset;
 }) {
   try {
     return await db.insert(chat).values({
@@ -92,6 +94,7 @@ export async function saveChat({
       userId,
       title,
       visibility,
+      dataset: dataset ?? null,
     });
   } catch (_error) {
     throw new ChatbotError("bad_request:database", "Failed to save chat");
@@ -557,6 +560,23 @@ export async function updateChatTitleById({
     return await db.update(chat).set({ title }).where(eq(chat.id, chatId));
   } catch (_error) {
     return;
+  }
+}
+
+export async function updateChatDatasetById({
+  chatId,
+  dataset,
+}: {
+  chatId: string;
+  dataset: typeof chat.$inferInsert.dataset;
+}) {
+  try {
+    return await db.update(chat).set({ dataset }).where(eq(chat.id, chatId));
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to update chat dataset by id"
+    );
   }
 }
 

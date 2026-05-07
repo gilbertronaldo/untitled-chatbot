@@ -9,6 +9,7 @@ import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -52,10 +53,68 @@ type ActiveChatContextValue = {
 };
 
 const ActiveChatContext = createContext<ActiveChatContextValue | null>(null);
+const DATASET_STORAGE_PREFIX = "chat-dataset:";
 
 function extractChatId(pathname: string): string | null {
   const match = pathname.match(/\/chat\/([^/]+)/);
   return match ? match[1] : null;
+}
+
+function getDatasetStorageKey(chatId: string) {
+  return `${DATASET_STORAGE_PREFIX}${chatId}`;
+}
+
+function readStoredDataset(chatId: string): LoadedDataset | null {
+  try {
+    const raw = window.localStorage.getItem(getDatasetStorageKey(chatId));
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as LoadedDataset;
+    if (
+      !parsed ||
+      typeof parsed.name !== "string" ||
+      typeof parsed.schema !== "string" ||
+      !Array.isArray(parsed.records)
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    window.localStorage.removeItem(getDatasetStorageKey(chatId));
+    return null;
+  }
+}
+
+function writeStoredDataset(chatId: string, dataset: LoadedDataset | null) {
+  try {
+    const key = getDatasetStorageKey(chatId);
+    if (!dataset) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    window.localStorage.setItem(key, JSON.stringify(dataset));
+  } catch {
+    console.warn("Unable to persist chat dataset.");
+  }
+}
+
+async function persistDatasetToServer(
+  chatId: string,
+  dataset: LoadedDataset | null
+) {
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/chat`, {
+      body: JSON.stringify({ id: chatId, dataset }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+    });
+  } catch {
+    console.warn("Unable to persist chat dataset on the server.");
+  }
 }
 
 export function ActiveChatProvider({ children }: { children: ReactNode }) {
@@ -83,14 +142,36 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
 
   const [input, setInput] = useState("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
-  const [activeDataset, setActiveDataset] = useState<LoadedDataset | null>(
+  const [activeDataset, setActiveDatasetState] = useState<LoadedDataset | null>(
     null
   );
   const activeDatasetRef = useRef(activeDataset);
+  const chatIdRef = useRef(chatId);
+  const chatExistsRef = useRef(!isNewChat);
 
   useEffect(() => {
-    activeDatasetRef.current = activeDataset;
-  }, [activeDataset]);
+    chatIdRef.current = chatId;
+    chatExistsRef.current = !isNewChat;
+  }, [chatId, isNewChat]);
+
+  const setActiveDataset = useCallback<
+    Dispatch<SetStateAction<LoadedDataset | null>>
+  >((value) => {
+    setActiveDatasetState((previousDataset) => {
+      const nextDataset =
+        typeof value === "function" ? value(previousDataset) : value;
+
+      activeDatasetRef.current = nextDataset;
+      writeStoredDataset(chatIdRef.current, nextDataset);
+      if (chatExistsRef.current) {
+        persistDatasetToServer(chatIdRef.current, nextDataset).catch(() => {
+          console.warn("Unable to persist chat dataset on the server.");
+        });
+      }
+
+      return nextDataset;
+    });
+  }, []);
 
   const { data: chatData, isLoading } = useSWR(
     isNewChat
@@ -99,6 +180,27 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     fetcher,
     { revalidateOnFocus: false }
   );
+
+  useEffect(() => {
+    if (!chatData || isNewChat) {
+      return;
+    }
+
+    const serverDataset = chatData.dataset ?? null;
+    activeDatasetRef.current = serverDataset;
+    setActiveDatasetState(serverDataset);
+    writeStoredDataset(chatId, serverDataset);
+  }, [chatData, chatId, isNewChat]);
+
+  useEffect(() => {
+    if (!isNewChat) {
+      return;
+    }
+
+    const storedDataset = readStoredDataset(chatId);
+    activeDatasetRef.current = storedDataset;
+    setActiveDatasetState(storedDataset);
+  }, [chatId, isNewChat]);
 
   const initialMessages: ChatMessage[] = isNewChat
     ? []
@@ -296,6 +398,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       currentModelId,
       showCreditCardAlert,
       activeDataset,
+      setActiveDataset,
     ]
   );
 

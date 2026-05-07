@@ -106,34 +106,39 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           <SidebarGroup className="pt-1">
             <SidebarGroupContent>
               <SidebarMenu>
+
+                {/* MAIN NAVIGATION */}
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    className="h-8 rounded-lg border border-sidebar-border text-[13px] text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    className="h-10 rounded-xl px-3 text-sm text-sidebar-foreground/75 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-foreground"
                     onClick={() => {
                       setOpenMobile(false);
                       router.push("/dashboard");
                     }}
                     tooltip="Dashboard"
                   >
-                    {/*Dashboard Icon*/}
-                    <LayoutDashboard className="size-4" />
-                    <span className="font-medium">Dashboard</span>
+                    <LayoutDashboard className="size-4 shrink-0" />
+                    <span>Dashboard</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    className="h-8 rounded-lg border border-sidebar-border text-[13px] text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    className="h-10 rounded-xl px-3 text-sm text-sidebar-foreground/75 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-foreground"
                     onClick={() => {
                       setOpenMobile(false);
                       router.push("/dashboard/data-warehouse");
                     }}
                     tooltip="Data Warehouse"
                   >
-                    {/*Dashboard Icon*/}
-                    <Database className="size-4" />
-                    <span className="font-medium">Data Warehouse</span>
+                    <Database className="size-4 shrink-0" />
+                    <span>Data Warehouse</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
+                {/* DIVIDER */}
+                <div className="my-2 border-t border-sidebar-border/50" />
+
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     className="h-8 rounded-lg border border-sidebar-border text-[13px] text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"

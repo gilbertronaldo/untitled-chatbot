@@ -2,8 +2,6 @@ import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/chat/artifact";
 import { explorerCatalog } from "@/components/chat/json-render-catalog";
 import { bankingDataset, datasetSchema } from "@/data/banking-dataset";
-import { ecommerceDatasetSchema } from "@/data/ecommerce-dataset";
-import { educationDatasetSchema } from "@/data/education-dataset";
 import { sampleDashboardList } from "@/lib/sample-dashboards";
 import type { LoadedDataset } from "@/lib/types";
 
@@ -173,8 +171,9 @@ VISUALIZATION RULES:
 - Keep visualization JSON valid and free of comments or trailing commas.
 - For charts, always provide \`type\`, \`chartType\`, \`title\`, and a \`data\` array.
 - If no visualization is needed, omit the visualization block.
-- If a user-selected dataset is provided later in this prompt, use that instead of the default dataset below.
+- Use only the active dataset provided in the ACTIVE DATASET section.
 - For dataset questions, compute directly from provided rows (count, sum, average, grouping, and trend over time where available).
+- If there is no active dataset relevant to the user's request, say so clearly instead of inventing data.
 
 RESPONSE FORMAT:
 1) If data-driven: \`<analysis>...</analysis>\`
@@ -183,20 +182,6 @@ RESPONSE FORMAT:
 
 Sample dashboard templates (adapt as needed):
 ${JSON.stringify(sampleDashboardList, null, 2)}
-
-**Dataset available:**
-${datasetSchema}
-
-/**
- * NOTE: The full dataset is embedded here for demo simplicity.
- * In production, replace with an on-demand query tool to reduce token usage.
- */
-**Full dataset (JSON):**
-${JSON.stringify(bankingDataset)}
-
-Additional demo datasets (use only if requested by user or selected in chat):
-- ${ecommerceDatasetSchema}
-- ${educationDatasetSchema}
 
 ${explorerCatalog.prompt({
   mode: "inline",
@@ -207,6 +192,28 @@ ${explorerCatalog.prompt({
   ],
 })}
 `;
+
+const defaultDatasetPrompt = `ACTIVE DATASET:
+Source: Default sample dataset
+Name: Banking Analytics Sample
+
+Schema:
+${datasetSchema}
+
+Full dataset (JSON):
+${JSON.stringify(bankingDataset)}`;
+
+function selectedDatasetPrompt(dataset: LoadedDataset) {
+  return `ACTIVE DATASET:
+Source: User-selected dataset
+Name: ${dataset.name}
+
+Schema:
+${dataset.schema}
+
+Full dataset (JSON):
+${JSON.stringify(dataset.records)}`;
+}
 
 export type RequestHints = {
   latitude: Geo["latitude"];
@@ -234,10 +241,8 @@ export const systemPrompt = ({
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
   const datasetPrompt = dataset
-    ? `User-selected dataset:\n${dataset.schema}\n\nFull dataset (JSON):\n${JSON.stringify(
-        dataset.records
-      )}`
-    : "";
+    ? selectedDatasetPrompt(dataset)
+    : defaultDatasetPrompt;
 
   if (!supportsTools) {
     return `${regularPrompt}\n\n${datasetPrompt}\n\n${requestPrompt}`.trim();

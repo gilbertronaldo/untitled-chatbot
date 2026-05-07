@@ -12,8 +12,7 @@ import {
 import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
-import { auth, type UserType } from "@/app/(auth)/auth";
-import { entitlementsByUserType } from "@/lib/ai/entitlements";
+import { auth } from "@/app/(auth)/auth";
 import {
   allowedModelIds,
   chatModels,
@@ -32,20 +31,24 @@ import {
   createStreamId,
   deleteChatById,
   getChatById,
-  getMessageCountByUserId,
   getMessagesByChatId,
   saveChat,
   saveMessages,
+  updateChatDatasetById,
   updateChatTitleById,
   updateMessage,
 } from "@/lib/db/queries";
 import type { DBMessage } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import { checkIpRateLimit } from "@/lib/ratelimit";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, LoadedDataset } from "@/lib/types";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
-import { type PostRequestBody, postRequestBodySchema } from "./schema";
+import {
+  datasetSchema,
+  type PostRequestBody,
+  postRequestBodySchema,
+} from "./schema";
 
 export const maxDuration = 60;
 
@@ -118,34 +121,29 @@ export async function POST(request: Request) {
 
     await checkIpRateLimit(ipAddress(request));
 
-    const userType: UserType = session.user.type;
-
-    const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
-      differenceInHours: 1,
-    });
-
-    // if (messageCount > entitlementsByUserType[userType].maxMessagesPerHour) {
-    //   return new ChatbotError("rate_limit:chat").toResponse();
-    // }
-
     const isToolApprovalFlow = Boolean(messages);
 
     const chat = await getChatById({ id });
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
+    let effectiveDataset: LoadedDataset | null = dataset ?? null;
 
     if (chat) {
       if (chat.userId !== session.user.id) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
       messagesFromDb = await getMessagesByChatId({ id });
+      effectiveDataset = dataset ?? chat.dataset ?? null;
+      if (dataset !== undefined) {
+        await updateChatDatasetById({ chatId: id, dataset });
+      }
     } else if (message?.role === "user") {
       await saveChat({
         id,
         userId: session.user.id,
         title: "New chat",
         visibility: selectedVisibilityType,
+        dataset: dataset ?? null,
       });
       titlePromise = generateTitleFromUserMessage({ message });
     }
@@ -229,7 +227,11 @@ export async function POST(request: Request) {
       execute: async ({ writer: dataStream }) => {
         const result = streamText({
           model: getLanguageModel(chatModel),
-          system: systemPrompt({ requestHints, supportsTools, dataset }),
+          system: systemPrompt({
+            requestHints,
+            supportsTools,
+            dataset: effectiveDataset,
+          }),
           messages: modelMessages,
           stopWhen: stepCountIs(5),
           experimental_activeTools:
@@ -391,4 +393,45 @@ export async function DELETE(request: Request) {
   const deletedChat = await deleteChatById({ id });
 
   return Response.json(deletedChat, { status: 200 });
+}
+
+export async function PATCH(request: Request) {
+  const session = await auth();
+
+  if (!session?.user) {
+    return new ChatbotError("unauthorized:chat").toResponse();
+  }
+
+  let body: { id: string; dataset: unknown };
+
+  try {
+    body = (await request.json()) as { id: string; dataset: unknown };
+  } catch (_) {
+    return new ChatbotError("bad_request:api").toResponse();
+  }
+
+  const chat = await getChatById({ id: body.id });
+
+  if (!chat) {
+    return new ChatbotError("not_found:chat").toResponse();
+  }
+
+  if (chat.userId !== session.user.id) {
+    return new ChatbotError("forbidden:chat").toResponse();
+  }
+
+  let dataset: LoadedDataset | null;
+
+  try {
+    dataset = body.dataset === null ? null : datasetSchema.parse(body.dataset);
+  } catch (_) {
+    return new ChatbotError("bad_request:api").toResponse();
+  }
+
+  await updateChatDatasetById({
+    chatId: body.id,
+    dataset,
+  });
+
+  return Response.json({ dataset });
 }

@@ -26,7 +26,7 @@ const toolApprovalMessageSchema = z.object({
   parts: z.array(z.record(z.unknown())),
 });
 
-const datasetSchema = z.object({
+export const datasetSchema = z.object({
   name: z.string().min(1).max(200),
   schema: z.string().min(1).max(10_000),
   records: z.array(z.record(z.unknown())).max(2000),
