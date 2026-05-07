@@ -52,8 +52,12 @@ function normalizeRecordValues(record: Record<string, unknown>) {
         if (trimmed === "") {
           return [key, null];
         }
-        const parsed = Number(trimmed.replace(/,/g, ""));
-        if (Number.isFinite(parsed) && /^-?\d+(\.\d+)?$/.test(trimmed)) {
+        const numericCandidate = trimmed.replace(/,/g, "");
+        const parsed = Number(numericCandidate);
+        if (
+          Number.isFinite(parsed) &&
+          /^-?\d+(\.\d+)?$/.test(numericCandidate)
+        ) {
           return [key, parsed];
         }
         return [key, trimmed];
