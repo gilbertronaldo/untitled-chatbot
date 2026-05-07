@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   createContext,
   type Dispatch,
+  type MutableRefObject,
   type ReactNode,
   type SetStateAction,
   useCallback,
@@ -102,18 +103,53 @@ function writeStoredDataset(chatId: string, dataset: LoadedDataset | null) {
   }
 }
 
+function sameDataset(left: LoadedDataset | null, right: LoadedDataset | null) {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return (
+    left.name === right.name &&
+    left.schema === right.schema &&
+    left.records.length === right.records.length
+  );
+}
+
 async function persistDatasetToServer(
   chatId: string,
   dataset: LoadedDataset | null
 ) {
   try {
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/chat`, {
-      body: JSON.stringify({ id: chatId, dataset }),
-      headers: { "Content-Type": "application/json" },
-      method: "PATCH",
-    });
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/chat`,
+      {
+        body: JSON.stringify({ id: chatId, dataset }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      }
+    );
+
+    return response.ok;
   } catch {
     console.warn("Unable to persist chat dataset on the server.");
+    return false;
+  }
+}
+
+async function persistPendingDatasetToServer(
+  chatId: string,
+  pending: { dataset: LoadedDataset | null },
+  pendingDatasetRef: MutableRefObject<{
+    dataset: LoadedDataset | null;
+  } | null>
+) {
+  const persisted = await persistDatasetToServer(chatId, pending.dataset);
+  if (persisted && pendingDatasetRef.current === pending) {
+    pendingDatasetRef.current = null;
   }
 }
 
@@ -148,6 +184,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const activeDatasetRef = useRef(activeDataset);
   const chatIdRef = useRef(chatId);
   const chatExistsRef = useRef(!isNewChat);
+  const pendingDatasetRef = useRef<{ dataset: LoadedDataset | null } | null>(
+    null
+  );
 
   useEffect(() => {
     chatIdRef.current = chatId;
@@ -160,13 +199,17 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     setActiveDatasetState((previousDataset) => {
       const nextDataset =
         typeof value === "function" ? value(previousDataset) : value;
+      const pendingDataset = { dataset: nextDataset };
 
       activeDatasetRef.current = nextDataset;
+      pendingDatasetRef.current = pendingDataset;
       writeStoredDataset(chatIdRef.current, nextDataset);
       if (chatExistsRef.current) {
-        persistDatasetToServer(chatIdRef.current, nextDataset).catch(() => {
-          console.warn("Unable to persist chat dataset on the server.");
-        });
+        persistPendingDatasetToServer(
+          chatIdRef.current,
+          pendingDataset,
+          pendingDatasetRef
+        );
       }
 
       return nextDataset;
@@ -187,6 +230,23 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     }
 
     const serverDataset = chatData.dataset ?? null;
+    const pendingDataset = pendingDatasetRef.current;
+
+    if (pendingDataset) {
+      if (sameDataset(pendingDataset.dataset, serverDataset)) {
+        pendingDatasetRef.current = null;
+      } else {
+        if (chatExistsRef.current) {
+          persistPendingDatasetToServer(
+            chatId,
+            pendingDataset,
+            pendingDatasetRef
+          );
+        }
+        return;
+      }
+    }
+
     activeDatasetRef.current = serverDataset;
     setActiveDatasetState(serverDataset);
     writeStoredDataset(chatId, serverDataset);

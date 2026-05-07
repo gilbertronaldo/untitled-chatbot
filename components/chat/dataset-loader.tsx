@@ -15,6 +15,8 @@ import {
 } from "@/data/education-dataset";
 import type { LoadedDataset } from "@/lib/types";
 
+const MAX_DATASET_RECORDS = 2000;
+
 function buildSchema(records: Record<string, unknown>[], name: string) {
   if (records.length === 0) {
     return `Dataset: ${name} (0 records)`;
@@ -65,6 +67,18 @@ function normalizeRecordValues(record: Record<string, unknown>) {
       return [key, value];
     })
   );
+}
+
+function limitRecords(records: Record<string, unknown>[]) {
+  if (records.length <= MAX_DATASET_RECORDS) {
+    return records;
+  }
+
+  toast.info(
+    `Dataset has ${records.length.toLocaleString()} rows. Loaded the first ${MAX_DATASET_RECORDS.toLocaleString()} rows.`
+  );
+
+  return records.slice(0, MAX_DATASET_RECORDS);
 }
 
 interface DatasetLoaderProps {
@@ -136,12 +150,14 @@ export function DatasetLoader({
 
             const raw = Array.isArray(parsed) ? parsed : [parsed];
 
-            const records = raw
-              .filter(
-                (r): r is Record<string, unknown> =>
-                  r !== null && typeof r === "object" && !Array.isArray(r)
-              )
-              .map((record) => normalizeRecordValues(record));
+            const records = limitRecords(
+              raw
+                .filter(
+                  (r): r is Record<string, unknown> =>
+                    r !== null && typeof r === "object" && !Array.isArray(r)
+                )
+                .map((record) => normalizeRecordValues(record))
+            );
 
             if (records.length === 0) {
               toast.error("JSON file must contain an array of objects.");
@@ -174,9 +190,11 @@ export function DatasetLoader({
             { header: true, skipEmptyLines: true }
           );
 
-          const records = result.data
-            .map((record) => normalizeRecordValues(record))
-            .filter((record) => Object.keys(record).length > 0);
+          const records = limitRecords(
+            result.data
+              .map((record) => normalizeRecordValues(record))
+              .filter((record) => Object.keys(record).length > 0)
+          );
 
           if (records.length === 0) {
             toast.error("CSV file has no valid rows.");
