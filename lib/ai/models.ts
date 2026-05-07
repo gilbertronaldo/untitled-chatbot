@@ -6,7 +6,7 @@ export const DEFAULT_CHAT_MODEL =
 
 export const titleModel = {
   id: process.env.DEFAULT_TITLE_MODEL ?? "gemini-2.5-pro",
-  name: "Gemini 2.5 Flash",
+  name: "Gemini 2.5 Pro",
   provider: "vertex",
   description: "Model used for generating conversation titles"
 };
@@ -26,39 +26,11 @@ export type ChatModel = {
   reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
 };
 
-// Models are resolved from the AI_PROVIDER env var at runtime.
-// For OpenAI / OpenAI-compatible (e.g. Ollama): set AI_PROVIDER=openai and
-//   OPENAI_API_KEY / OPENAI_BASE_URL (leave OPENAI_BASE_URL unset for OpenAI).
-// For Google Vertex AI: set AI_PROVIDER=vertex and GOOGLE_VERTEX_PROJECT.
-export const openaiModels: ChatModel[] = [
-  {
-    id: "gpt-4o-mini",
-    name: "GPT-4o Mini",
-    provider: "openai",
-    description: "Fast and affordable model with vision and tool use",
-    capabilities: { tools: true, vision: true, reasoning: false },
-  },
-  {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    provider: "openai",
-    description: "Highly capable model with vision and tool use",
-    capabilities: { tools: true, vision: true, reasoning: false },
-  },
-  {
-    id: "o4-mini",
-    name: "o4 Mini",
-    provider: "openai",
-    description: "Efficient reasoning model",
-    capabilities: { tools: true, vision: false, reasoning: true },
-    reasoningEffort: "medium",
-  },
-];
 
 export const vertexModels: ChatModel[] = [
   {
     id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Flash",
+    name: "Gemini 2.5 Pro",
     provider: "vertex",
     description: "Fast and capable Gemini model with tool use",
     capabilities: { tools: true, vision: true, reasoning: false },

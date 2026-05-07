@@ -244,10 +244,10 @@ export async function POST(request: Request) {
         });
 
         dataStream.merge(
-          result.toUIMessageStream({ sendReasoning: isReasoningModel })
+          pipeJsonRender(
+            result.toUIMessageStream({ sendReasoning: isReasoningModel })
+          )
         );
-
-        dataStream.merge(pipeJsonRender(result.toUIMessageStream()));
 
         if (titlePromise) {
           const title = await titlePromise;
