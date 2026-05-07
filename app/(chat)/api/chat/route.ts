@@ -5,6 +5,7 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   generateId,
+  type ModelMessage,
   stepCountIs,
   streamText,
 } from "ai";
@@ -58,6 +59,30 @@ function getStreamContext() {
 
 export { getStreamContext };
 
+function hasModelContent(message: ModelMessage) {
+  const { content } = message;
+
+  if (typeof content === "string") {
+    return content.trim().length > 0;
+  }
+
+  if (Array.isArray(content)) {
+    return content.some((part) => {
+      if (part == null || typeof part !== "object") {
+        return false;
+      }
+
+      if ("text" in part && typeof part.text === "string") {
+        return part.text.trim().length > 0;
+      }
+
+      return true;
+    });
+  }
+
+  return content != null;
+}
+
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
@@ -100,9 +125,9 @@ export async function POST(request: Request) {
       differenceInHours: 1,
     });
 
-    if (messageCount > entitlementsByUserType[userType].maxMessagesPerHour) {
-      return new ChatbotError("rate_limit:chat").toResponse();
-    }
+    // if (messageCount > entitlementsByUserType[userType].maxMessagesPerHour) {
+    //   return new ChatbotError("rate_limit:chat").toResponse();
+    // }
 
     const isToolApprovalFlow = Boolean(messages);
 
@@ -193,7 +218,11 @@ export async function POST(request: Request) {
     const isReasoningModel = capabilities?.reasoning === true;
     const supportsTools = capabilities?.tools === true;
 
-    const modelMessages = await convertToModelMessages(uiMessages);
+    const modelMessages = (
+      await convertToModelMessages(uiMessages, {
+        ignoreIncompleteToolCalls: true,
+      })
+    ).filter(hasModelContent);
 
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,

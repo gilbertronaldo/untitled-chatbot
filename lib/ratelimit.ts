@@ -37,9 +37,9 @@ export async function checkIpRateLimit(ip: string | undefined) {
       .expire(key, TTL_SECONDS, "NX")
       .exec();
 
-    if (typeof count === "number" && count > MAX_MESSAGES) {
-      throw new ChatbotError("rate_limit:chat");
-    }
+    // if (typeof count === "number" && count > MAX_MESSAGES) {
+    //   throw new ChatbotError("rate_limit:chat");
+    // }
   } catch (error) {
     if (error instanceof ChatbotError) {
       throw error;

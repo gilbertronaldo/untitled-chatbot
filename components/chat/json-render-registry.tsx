@@ -195,6 +195,57 @@ function AnimatedGroup({
 	);
 }
 
+function stringOrUndefined(value: unknown) {
+	return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeTableColumn(column: unknown, index: number) {
+	if (column && typeof column === "object" && !Array.isArray(column)) {
+		const record = column as Record<string, unknown>;
+		const key =
+			stringOrUndefined(record.key) ??
+			stringOrUndefined(record.id) ??
+			stringOrUndefined(record.accessorKey) ??
+			stringOrUndefined(record.accessor) ??
+			stringOrUndefined(record.field) ??
+			stringOrUndefined(record.name) ??
+			stringOrUndefined(record.label) ??
+			stringOrUndefined(record.header) ??
+			`Column ${index + 1}`;
+		const label =
+			stringOrUndefined(record.label) ??
+			stringOrUndefined(record.header) ??
+			stringOrUndefined(record.name) ??
+			key;
+
+		return { key, label };
+	}
+
+	const key =
+		typeof column === "string" && column.trim()
+			? column.trim()
+			: `Column ${index + 1}`;
+
+	return { key, label: key };
+}
+
+function uniqueTableColumns(columns: unknown[]) {
+	const seen = new Map<string, number>();
+
+	return columns.map((column, index) => {
+		const normalized = normalizeTableColumn(column, index);
+		const count = seen.get(normalized.key) ?? 0;
+		seen.set(normalized.key, count + 1);
+
+		return count === 0
+			? normalized
+			: {
+					...normalized,
+					key: `${normalized.key} ${count + 1}`,
+				};
+	});
+}
+
 // =============================================================================
 // Registry
 // =============================================================================
@@ -256,6 +307,9 @@ export const { registry, handlers } = defineRegistry(explorerCatalog, {
 						Record<string, unknown>
 					>)
 					: [];
+			const columns = uniqueTableColumns(
+				Array.isArray(props.columns) ? props.columns : Object.keys(items[0] ?? {}),
+			);
 
 			const [sortKey, setSortKey] = useState<string | null>(null);
 			const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -297,7 +351,7 @@ export const { registry, handlers } = defineRegistry(explorerCatalog, {
 				<Table>
 					<TableHeader>
 						<TableRow>
-							{props.columns.map((col) => {
+							{columns.map((col) => {
 								const SortIcon =
 									sortKey === col.key
 										? sortDir === "asc"
@@ -322,7 +376,7 @@ export const { registry, handlers } = defineRegistry(explorerCatalog, {
 					<TableBody>
 						{sorted.map((item, i) => (
 							<TableRow key={i}>
-								{props.columns.map((col) => (
+								{columns.map((col) => (
 									<TableCell key={col.key}>
 										{String(item[col.key] ?? "")}
 									</TableCell>

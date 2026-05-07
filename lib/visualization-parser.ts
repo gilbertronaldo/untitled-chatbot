@@ -504,8 +504,9 @@ function normalizeTableSpec(value: Record<string, unknown>): TableSpec | null {
   }
 
   let rows: Record<string, string | number | null>[] = [];
-  const columns = Array.isArray(value.columns ?? value.headers)
-    ? (value.columns ?? value.headers)?.map(String)
+  const columnsRaw = value.columns ?? value.headers;
+  const columns = Array.isArray(columnsRaw)
+    ? uniqueColumnNames(columnsRaw.map(normalizeColumnName))
     : undefined;
 
   if (rowsRaw.every((row) => Array.isArray(row))) {
@@ -585,6 +586,47 @@ function sanitizeRow(
   return Object.fromEntries(
     Object.entries(row).map(([key, value]) => [key, valueOrNull(value)])
   );
+}
+
+function normalizeColumnName(column: unknown, index: number): string {
+  if (typeof column === "string" && column.trim()) {
+    return column.trim();
+  }
+
+  if (typeof column === "number" && Number.isFinite(column)) {
+    return String(column);
+  }
+
+  if (isRecord(column)) {
+    const key =
+      stringOrUndefined(column.key) ??
+      stringOrUndefined(column.id) ??
+      stringOrUndefined(column.accessorKey) ??
+      stringOrUndefined(column.accessor) ??
+      stringOrUndefined(column.field) ??
+      stringOrUndefined(column.name) ??
+      stringOrUndefined(column.label) ??
+      stringOrUndefined(column.header);
+
+    if (key) {
+      return key;
+    }
+  }
+
+  return `Column ${index + 1}`;
+}
+
+function uniqueColumnNames(columns: string[]): string[] {
+  const seen = new Map<string, number>();
+
+  return columns.map((column, index) => {
+    const fallback = `Column ${index + 1}`;
+    const base = column.trim() || fallback;
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+
+    return count === 0 ? base : `${base} ${count + 1}`;
+  });
 }
 
 function valueOrNull(value: unknown): string | number | null {
