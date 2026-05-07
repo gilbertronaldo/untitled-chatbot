@@ -6,6 +6,17 @@ import type {
   VisualizationSpec,
 } from "@/lib/visualization-parser";
 
+function getWidgetClassName(widget: VisualizationSpec) {
+  switch (widget.type) {
+    case "metric":
+      return "min-h-[120px]";
+    case "table":
+      return "md:col-span-2 xl:col-span-3";
+    default:
+      return "min-h-[240px]";
+  }
+}
+
 export function DashboardRenderer({
   spec,
   renderWidget,
@@ -55,13 +66,7 @@ export function DashboardRenderer({
         <div className={`grid gap-3 ${gridClass}`}>
           {spec.widgets.map((widget, index) => (
             <div
-              className={
-                widget.type === "metric"
-                  ? "min-h-[120px]"
-                  : widget.type === "table"
-                    ? "md:col-span-2 xl:col-span-3"
-                    : "min-h-[240px]"
-              }
+              className={getWidgetClassName(widget)}
               key={`dashboard-widget-${widget.type}-${index}`}
             >
               {renderWidget(widget, index)}
