@@ -25,14 +25,14 @@ export default function DashboardHeader() {
 				<PanelLeftIcon className="size-4" />
 			</Button>
 
-			<Link
-				className="flex size-8 items-center justify-center rounded-lg md:hidden"
-				href="https://vercel.com/templates/next.js/chatbot"
-				rel="noopener noreferrer"
-				target="_blank"
-			>
-				<VercelIcon size={14} />
-			</Link>
+			{/*<Link*/}
+			{/*	className="flex size-8 items-center justify-center rounded-lg md:hidden"*/}
+			{/*	href="https://vercel.com/templates/next.js/chatbot"*/}
+			{/*	rel="noopener noreferrer"*/}
+			{/*	target="_blank"*/}
+			{/*>*/}
+			{/*	<VercelIcon size={14} />*/}
+			{/*</Link>*/}
 
 			{/*{!isReadonly && (*/}
 			{/*	<VisibilitySelector*/}
