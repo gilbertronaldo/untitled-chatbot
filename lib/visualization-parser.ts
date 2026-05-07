@@ -107,7 +107,9 @@ export function parseVisualizationResponse(
           visualization: parsed,
         });
       } else {
-        segments.push({ kind: "text", content: match[0] });
+        console.error("[visualization] Ignoring malformed visualization fence", {
+          raw: raw.slice(0, 1000),
+        });
       }
     } else {
       segments.push({ kind: "text", content: match[0] });

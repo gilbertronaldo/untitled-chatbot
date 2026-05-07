@@ -187,9 +187,8 @@ const PurePreviewMessage = ({
     }
 
     if (type === "text") {
-      // For assistant messages, always parse visualization blocks so that
-      // ```visualization fences never reach Streamdown/Shiki (which would log
-      // "Language `visualization` is not included in this bundle").
+      // For assistant messages, always parse visualization payloads so malformed
+      // chart output never reaches the markdown renderer.
       if (message.role === "assistant") {
         const segments = parseVisualizationResponse(sanitizeText(part.text));
         const shouldUseSegmentRendering =
