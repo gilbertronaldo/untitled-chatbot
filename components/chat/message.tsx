@@ -1,9 +1,11 @@
 "use client";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { SPEC_DATA_PART_TYPE } from "@json-render/core";
-import { Renderer, useJsonRenderMessage } from "@json-render/react";
-import { registry } from "@/components/chat/json-render-registry";
-import { VisualizationRenderer } from "@/components/renderers/VisualizationRenderer";
+import { useJsonRenderMessage } from "@json-render/react";
+import {
+  JsonRenderVisualizationRenderer,
+  VisualizationRenderer,
+} from "@/components/renderers/VisualizationRenderer";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
@@ -198,10 +200,9 @@ const PurePreviewMessage = ({
         if (shouldUseSegmentRendering) {
           return (
             <div className="flex flex-col gap-2" key={key}>
-              {hasSpec && <Renderer registry={registry} spec={spec} />}
+              {hasSpec && <JsonRenderVisualizationRenderer spec={spec} />}
 
               {segments.map((seg, si) => {
-                console.log(segments);
                 if (seg.kind === "visualization") {
                   const vizKey = `${key}-viz-${seg.content.slice(0, 12)}-${si}`;
                   return (

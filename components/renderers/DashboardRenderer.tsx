@@ -53,7 +53,20 @@ export function DashboardRenderer({
         </div>
       ) : (
         <div className={`grid gap-3 ${gridClass}`}>
-          {spec.widgets.map((widget, index) => renderWidget(widget, index))}
+          {spec.widgets.map((widget, index) => (
+            <div
+              className={
+                widget.type === "metric"
+                  ? "min-h-[120px]"
+                  : widget.type === "table"
+                    ? "md:col-span-2 xl:col-span-3"
+                    : "min-h-[240px]"
+              }
+              key={`dashboard-widget-${widget.type}-${index}`}
+            >
+              {renderWidget(widget, index)}
+            </div>
+          ))}
         </div>
       )}
     </div>

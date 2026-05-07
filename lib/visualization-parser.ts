@@ -203,44 +203,36 @@ function safeParseVisualization(raw: string): VisualizationSpec | null {
     return null;
   }
 
-  try {
-    const parsed = JSON.parse(raw);
-    const normalized = normalizeVisualizationSpec(parsed);
-    if (normalized) {
-      console.debug("[visualization] Parsed visualization block", normalized);
-    } else {
-      console.warn("[visualization] Unsupported visualization schema", parsed);
-    }
-    return normalized;
-  } catch (error) {
+  const candidates = collectJsonCandidates(raw);
+  for (const candidate of candidates) {
     try {
-      const jsonl = raw
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-      for (const line of jsonl) {
-        const parsed = JSON.parse(line);
-        const normalized = normalizeVisualizationSpec(parsed);
-        if (normalized) {
-          console.debug(
-            "[visualization] Parsed visualization JSONL block",
-            normalized
-          );
-          return normalized;
-        }
+      const parsed = JSON.parse(candidate);
+      const normalized = normalizeVisualizationSpec(parsed);
+      if (normalized) {
+        console.debug("[visualization] Parsed visualization block", normalized);
+        return normalized;
       }
-    } catch (innerError) {
-      console.debug("[visualization] Failed to parse visualization JSON", {
-        error,
-        innerError,
-      });
+    } catch (_error) {
+      continue;
     }
   }
+
+  console.debug("[visualization] Failed to parse visualization JSON", {
+    raw: raw.slice(0, 400),
+  });
 
   return null;
 }
 
 function normalizeVisualizationSpec(value: unknown): VisualizationSpec | null {
+  if (isRecord(value)) {
+    const wrapped =
+      value.visualization ?? value.spec ?? value.result ?? value.output;
+    if (wrapped && wrapped !== value) {
+      return normalizeVisualizationSpec(wrapped);
+    }
+  }
+
   if (Array.isArray(value)) {
     const widgets = value
       .map((entry) => normalizeVisualizationSpec(entry))
@@ -292,19 +284,57 @@ function normalizeChartSpec(value: Record<string, unknown>): ChartSpec | null {
     return null;
   }
 
-  const data = rawData
+  let data = rawData
     .map((entry): ChartDataPoint | null => {
       if (!isRecord(entry)) {
         return null;
       }
-      const label = stringOrUndefined(entry.label ?? entry.name);
-      const value = numberOrNull(entry.value ?? entry.amount ?? entry.count);
+      const label = stringOrUndefined(
+        entry.label ??
+          entry.name ??
+          entry.category ??
+          entry.x ??
+          entry.key ??
+          entry.dimension
+      );
+      const value = numberOrNull(
+        entry.value ??
+          entry.amount ??
+          entry.count ??
+          entry.y ??
+          entry.total ??
+          entry.metric
+      );
       if (!label || value === null) {
         return null;
       }
       return { label, value };
     })
     .filter(Boolean) as ChartDataPoint[];
+
+  if (data.length === 0 && Array.isArray(rawData)) {
+    const categoryKey = stringOrUndefined(
+      value.xKey ?? value.categoryKey ?? value.labelKey
+    );
+    const metricKey = stringOrUndefined(
+      value.yKey ?? value.valueKey ?? value.metricKey
+    );
+    if (categoryKey && metricKey) {
+      data = rawData
+        .map((entry): ChartDataPoint | null => {
+          if (!isRecord(entry)) {
+            return null;
+          }
+          const label = stringOrUndefined(entry[categoryKey]);
+          const metric = numberOrNull(entry[metricKey]);
+          if (!label || metric === null) {
+            return null;
+          }
+          return { label, value: metric };
+        })
+        .filter(Boolean) as ChartDataPoint[];
+    }
+  }
 
   if (data.length === 0) {
     return null;
@@ -339,7 +369,11 @@ function normalizeDashboardSpec(
     type: "dashboard",
     title: stringOrUndefined(value.title ?? value.name),
     widgets,
-    columns: numberOrUndefined(value.columns ?? value.gridColumns),
+    columns: numberOrUndefined(
+      value.columns ??
+        value.gridColumns ??
+        (isRecord(value.layout) ? value.layout.columns : undefined)
+    ),
   };
 }
 
@@ -496,4 +530,33 @@ function stringOrUndefined(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectJsonCandidates(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const candidates = new Set<string>([trimmed]);
+
+  const firstBrace = trimmed.indexOf("{");
+  if (firstBrace >= 0) {
+    const balanced = extractBalancedJson(trimmed, firstBrace);
+    if (balanced) {
+      candidates.add(balanced.json);
+    }
+  }
+
+  const jsonl = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const line of jsonl) {
+    if (line.startsWith("{") || line.startsWith("[")) {
+      candidates.add(line);
+    }
+  }
+
+  return [...candidates];
 }
